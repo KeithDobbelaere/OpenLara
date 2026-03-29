@@ -1,9 +1,28 @@
+# Tomb Raider game data / media
 *.PHD
-*.ogg
 *.PSX
-*.PNG
-*.PCX
+*.SAT
+*.TR2
+*.TR4
+*.tr2
+*.tr4
+*.SFX
+*.FMV
+*.RPL
+*.ogg
+*.OGG
 *.RAW
-*.zip
-*.txt
+*.PCX
+*.PNG
 
+# Ignore copied game-content subfolders entirely
+TR1_PC/
+TR1_PSX/
+TR2_PC/
+TR2_PSX/
+TR3_PC/
+TR3_PSX/
+TR4_PC/
+
+# Keep this file itself
+!.gitignore
