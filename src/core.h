@@ -33,6 +33,15 @@
     #endif
 
     #undef OS_PTHREAD_MT
+#elif __PICOCALC__
+    #define _OS_WIN 1
+    #define _GAPI_PICOCALC 1
+    #include <windows.h>
+
+    #undef OS_PTHREAD_MT
+
+    #define INV_VIBRATION
+    #define INV_QUALITY
 #elif WIN32
     #define _OS_WIN      1
     #define _GAPI_GL     1
@@ -791,7 +800,9 @@ namespace Core {
     } stats;
 }
 
-#ifdef _GAPI_SW
+#ifdef _GAPI_PICOCALC
+    #include "gapi/picocalc.h"
+#elif _GAPI_SW
     #include "gapi/sw.h"
 #elif _GAPI_GL
     #include "gapi/gl.h"
@@ -1303,7 +1314,7 @@ namespace Core {
     }
 
     void setFog(const vec4 &params) {
-    #if defined(_GAPI_D3D8) || defined(_GAPI_C3D) || defined(_GAPI_SW) || defined(FFP)
+#if defined(_GAPI_D3D8) || defined(_GAPI_C3D) || defined(_GAPI_SW) || defined(_GAPI_PICOCALC) || defined(FFP)
         GAPI::setFog(params);
     #else
         ASSERT(Core::active.shader);
