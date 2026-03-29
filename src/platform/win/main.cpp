@@ -409,10 +409,50 @@ HWND hWnd;
         SetDIBitsToDevice(hDC, 0, 0, Core::width, Core::height, 0, 0, 0, Core::height, GAPI::swColor, &bmi, DIB_RGB_COLORS);
     }
 #elif _GAPI_PICOCALC
-    static void ContextResize() {}
-    static void ContextSwap() {}
-    static void ContextDelete() {}
-    static void ContextCreate() {}
+static BITMAPINFO g_picoBMI;
+
+static void ContextCreate() {
+    memset(&g_picoBMI, 0, sizeof(g_picoBMI));
+    g_picoBMI.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    g_picoBMI.bmiHeader.biPlanes = 1;
+    g_picoBMI.bmiHeader.biBitCount = 32;
+    g_picoBMI.bmiHeader.biCompression = BI_RGB;
+}
+
+static void ContextResize() {
+    // nothing needed; we size from the software buffer each frame
+}
+
+static void ContextSwap() {
+    const uint32* pixels = GAPI::getPresentBuffer();
+    const int srcW = GAPI::getPresentWidth();
+    const int srcH = GAPI::getPresentHeight();
+
+    if (!pixels || srcW <= 0 || srcH <= 0)
+        return;
+
+    RECT rc;
+    GetClientRect(hWnd, &rc);
+
+    g_picoBMI.bmiHeader.biWidth = srcW;
+    g_picoBMI.bmiHeader.biHeight = -srcH; // top-down
+
+    HDC dc = GetDC(hWnd);
+    StretchDIBits(
+        dc,
+        0, 0, rc.right - rc.left, rc.bottom - rc.top,
+        0, 0, srcW, srcH,
+        pixels,
+        &g_picoBMI,
+        DIB_RGB_COLORS,
+        SRCCOPY
+    );
+    ReleaseDC(hWnd, dc);
+}
+
+static void ContextDelete() {
+}
+
 #elif _GAPI_GL
     HDC   hDC;
     HGLRC hRC;

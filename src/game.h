@@ -111,7 +111,7 @@ void loadSettings(Stream *stream, void *userData) {
     Core::settings.version = SETTINGS_VERSION;
     Core::setVSync(Core::settings.detail.vsync != 0);
 
-    #if defined(_GAPI_SW) || defined(_GAPI_GU)
+    #if defined(_GAPI_SW) || defined(_GAPI_PICOCALC) || defined(_GAPI_GU)
         Core::settings.detail.filter   = Core::Settings::LOW;
         Core::settings.detail.lighting = Core::Settings::LOW;
         Core::settings.detail.shadows  = Core::Settings::LOW;

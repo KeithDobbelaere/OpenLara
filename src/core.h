@@ -237,7 +237,7 @@
     #include "libs/tinf/tinf.h"
 #endif
 
-#if defined(_GAPI_SW) || defined(_GAPI_GU)
+#if defined(_GAPI_SW) || defined (_GAPI_PICOCALC) || defined(_GAPI_GU)
     #define FFP
 #endif
 
@@ -402,7 +402,7 @@ namespace Core {
             }
 
             void setLighting(Quality value) {
-            #if defined(_GAPI_SW) || defined(_GAPI_GU)
+            #if defined(_GAPI_SW) || defined(_GAPI_PICOCALC) || defined(_GAPI_GU)
                 lighting = LOW;
             #else
                 lighting = value;
@@ -410,7 +410,7 @@ namespace Core {
             }
 
             void setShadows(Quality value) {
-            #if defined(_GAPI_SW) || defined(_GAPI_GU)
+            #if defined(_GAPI_SW) || defined(_GAPI_PICOCALC) || defined(_GAPI_GU)
                 shadows = LOW;
             #else
                 shadows = value;
@@ -418,7 +418,7 @@ namespace Core {
             }
 
             void setWater(Quality value) {
-            #if defined(_GAPI_SW) || defined(_GAPI_GU)
+            #if defined(_GAPI_SW) || defined(_GAPI_PICOCALC) || defined(_GAPI_GU)
                 water = LOW;
             #else
                 if (value > LOW && !(support.texFloat || support.texHalf))
