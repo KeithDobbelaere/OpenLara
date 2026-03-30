@@ -34,9 +34,9 @@
 
     #undef OS_PTHREAD_MT
 #elif __PICOCALC__
-    #define _OS_WIN 1
+    //#define _OS_WIN 1
     #define _GAPI_PICOCALC 1
-    #include <windows.h>
+    //#include <windows.h>
 
     #undef OS_PTHREAD_MT
 

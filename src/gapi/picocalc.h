@@ -1,5 +1,14 @@
 #pragma once
 
+#include <cmath>
+#include <cstdio>
+#include <cstring>
+#include <cstdlib>
+
+#ifdef _OS_WIN
+#include <windows.h>
+#endif
+
 #define PROFILE_MARKER(title)
 #define PROFILE_LABEL(id, name, label)
 #define PROFILE_TIMING(time)
@@ -118,54 +127,6 @@ namespace GAPI {
 
     static inline float piEdgeFunction(float ax, float ay, float bx, float by, float cx, float cy) {
         return (cx - ax) * (by - ay) - (cy - ay) * (bx - ax);
-    }
-
-    struct PiDebugVertex {
-        vec4 clip;
-        vec3 ndc;
-        float sx, sy;
-        bool valid;
-    };
-
-    static void piFillTriangle(const PiDebugVertex& a, const PiDebugVertex& b, const PiDebugVertex& c, uint32 color) {
-        if (!piColor || piWidth <= 0 || piHeight <= 0)
-            return;
-
-        float minXf = floorf(min(a.sx, min(b.sx, c.sx)));
-        float minYf = floorf(min(a.sy, min(b.sy, c.sy)));
-        float maxXf = ceilf(max(a.sx, max(b.sx, c.sx)));
-        float maxYf = ceilf(max(a.sy, max(b.sy, c.sy)));
-
-        int minX = max(0, (int)minXf);
-        int minY = max(0, (int)minYf);
-        int maxX = min(piWidth - 1, (int)maxXf);
-        int maxY = min(piHeight - 1, (int)maxYf);
-
-        float area = piEdgeFunction(a.sx, a.sy, b.sx, b.sy, c.sx, c.sy);
-        if (fabsf(area) < 0.5f)
-            return;
-
-        bool positive = area > 0.0f;
-
-        for (int y = minY; y <= maxY; y++) {
-            for (int x = minX; x <= maxX; x++) {
-                float px = (float)x + 0.5f;
-                float py = (float)y + 0.5f;
-
-                float w0 = piEdgeFunction(b.sx, b.sy, c.sx, c.sy, px, py);
-                float w1 = piEdgeFunction(c.sx, c.sy, a.sx, a.sy, px, py);
-                float w2 = piEdgeFunction(a.sx, a.sy, b.sx, b.sy, px, py);
-
-                if (positive) {
-                    if (w0 >= 0.0f && w1 >= 0.0f && w2 >= 0.0f)
-                        piPutPixel(x, y, color);
-                }
-                else {
-                    if (w0 <= 0.0f && w1 <= 0.0f && w2 <= 0.0f)
-                        piPutPixel(x, y, color);
-                }
-            }
-        }
     }
 
     struct PiBmpFileHeader {
@@ -798,7 +759,7 @@ namespace GAPI {
             if (x < 0.0f) x = 0.0f;
             if (x > 1.0f) x = 1.0f;
             return (uint32)(x * 255.0f + 0.5f);
-            };
+        };
 
         uint32 r = clampByte(color.x);
         uint32 g = clampByte(color.y);

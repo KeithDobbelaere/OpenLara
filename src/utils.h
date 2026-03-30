@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <float.h>
+#include <cstring>
 
 //#define TEST_SLOW_FIO
 
@@ -204,11 +205,13 @@ inline float quintic(float x) {
     return x * x * x * (x * (x * 6 - 15) + 10);
 }
 
+#if __cplusplus <= 201703L
 inline float lerp(float a, float b, float t) {
     if (t <= 0.0f) return a;
     if (t >= 1.0f) return b;
     return a + (b - a) * t;
 }
+#endif
 
 float lerpAngle(float a, float b, float t) {
     if (t <= 0.0f) return a;

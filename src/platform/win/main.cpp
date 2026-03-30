@@ -409,49 +409,69 @@ HWND hWnd;
         SetDIBitsToDevice(hDC, 0, 0, Core::width, Core::height, 0, 0, 0, Core::height, GAPI::swColor, &bmi, DIB_RGB_COLORS);
     }
 #elif _GAPI_PICOCALC
-static BITMAPINFO g_picoBMI;
+    static BITMAPINFO g_picoBMI;
 
-static void ContextCreate() {
-    memset(&g_picoBMI, 0, sizeof(g_picoBMI));
-    g_picoBMI.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    g_picoBMI.bmiHeader.biPlanes = 1;
-    g_picoBMI.bmiHeader.biBitCount = 32;
-    g_picoBMI.bmiHeader.biCompression = BI_RGB;
-}
+    static void ContextCreate() {
+        memset(&g_picoBMI, 0, sizeof(g_picoBMI));
+        g_picoBMI.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        g_picoBMI.bmiHeader.biPlanes = 1;
+        g_picoBMI.bmiHeader.biBitCount = 32;
+        g_picoBMI.bmiHeader.biCompression = BI_RGB;
+    }
 
-static void ContextResize() {
-    // nothing needed; we size from the software buffer each frame
-}
+    static void ContextResize() {
+        // nothing needed; we size from the software buffer each frame
+    }
 
-static void ContextSwap() {
-    const uint32* pixels = GAPI::getPresentBuffer();
-    const int srcW = GAPI::getPresentWidth();
-    const int srcH = GAPI::getPresentHeight();
+    static void ContextSwap() {
+        const uint32* pixels = GAPI::getPresentBuffer();
+        const int srcW = GAPI::getPresentWidth();
+        const int srcH = GAPI::getPresentHeight();
 
-    if (!pixels || srcW <= 0 || srcH <= 0)
-        return;
+        if (!pixels || srcW <= 0 || srcH <= 0)
+            return;
 
-    RECT rc;
-    GetClientRect(hWnd, &rc);
+        RECT rc;
+        GetClientRect(hWnd, &rc);
 
-    g_picoBMI.bmiHeader.biWidth = srcW;
-    g_picoBMI.bmiHeader.biHeight = -srcH; // top-down
+        const int dstW = rc.right - rc.left;
+        const int dstH = rc.bottom - rc.top;
+        if (dstW <= 0 || dstH <= 0)
+            return;
 
-    HDC dc = GetDC(hWnd);
-    StretchDIBits(
-        dc,
-        0, 0, rc.right - rc.left, rc.bottom - rc.top,
-        0, 0, srcW, srcH,
-        pixels,
-        &g_picoBMI,
-        DIB_RGB_COLORS,
-        SRCCOPY
-    );
-    ReleaseDC(hWnd, dc);
-}
+        int blitW = dstW;
+        int blitH = (dstW * srcH) / srcW;
 
-static void ContextDelete() {
-}
+        if (blitH > dstH) {
+            blitH = dstH;
+            blitW = (dstH * srcW) / srcH;
+        }
+
+        const int blitX = (dstW - blitW) / 2;
+        const int blitY = (dstH - blitH) / 2;
+
+        g_picoBMI.bmiHeader.biWidth = srcW;
+        g_picoBMI.bmiHeader.biHeight = -srcH; // top-down
+
+        HDC dc = GetDC(hWnd);
+
+        PatBlt(dc, 0, 0, dstW, dstH, BLACKNESS);
+
+        StretchDIBits(
+            dc,
+            blitX, blitY, blitW, blitH,
+            0, 0, srcW, srcH,
+            pixels,
+            &g_picoBMI,
+            DIB_RGB_COLORS,
+            SRCCOPY
+        );
+
+        ReleaseDC(hWnd, dc);
+    }
+
+    static void ContextDelete() {
+    }
 
 #elif _GAPI_GL
     HDC   hDC;
@@ -1050,7 +1070,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
     strcpy(saveDir, cacheDir);
     CreateDirectory(cacheDir, NULL);
 
-    RECT r = { 0, 0, 1280, 720 };
+    RECT r = { 0, 0, 1024, 1024 };
 
     int sw = GetSystemMetrics(SM_CXSCREEN);
     int sh = GetSystemMetrics(SM_CYSCREEN);

@@ -1703,7 +1703,7 @@ struct Inventory {
                 rd +=  296 * phaseChoose;
             }
 
-            Basis b = basis * Basis(quat(vec3(0, 1, 0), PI + ia - a), vec3(sinf(a), 0, -cosf(a)) * rd - vec3(0, item->desc.page * INV_HEIGHT - rh, 0));
+            Basis b = basis * Basis(quat(vec3(0, 1, 0), PI + ia - a), vec3(sinf(a), 0, -cosf(a)) * rd - vec3(0, item->desc.page * int(INV_HEIGHT) - rh, 0));
 
             if (item->type == TR::Entity::INV_COMPASS) {
                 b.rotate(quat(vec3(1.0f, 0.0f, 0.0f), -phaseChoose * PI * 0.1f));
