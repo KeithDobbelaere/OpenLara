@@ -36,6 +36,30 @@ size_t PicoFile::tell() const {
     return (p < 0) ? 0u : static_cast<size_t>(p);
 }
 
+size_t PicoFile::size() const {
+    if (!f_) {
+        return 0;
+    }
+
+    const long oldPos = std::ftell(f_);
+    if (oldPos < 0) {
+        return 0;
+    }
+
+    if (std::fseek(f_, 0, SEEK_END) != 0) {
+        return 0;
+    }
+
+    const long endPos = std::ftell(f_);
+
+    // Restore original position best-effort.
+    std::fseek(f_, oldPos, SEEK_SET);
+
+    size_t result = (endPos >= 0) ? static_cast<size_t>(endPos) : 0;
+    std::printf("file size: %ld\n", (long)result);
+    return result;
+}
+
 void PicoFile::close() {
     if (f_) {
         std::fclose(f_);
@@ -63,7 +87,12 @@ PicoFile* PicoFileSystem::openRead(const char* path) {
     if (!inited_ || !path || !*path) return nullptr;
 
     FILE* f = std::fopen(path, "rb");
-    if (!f) return nullptr;
+    if (!f) {
+        std::printf("openRead FAILED: \"%s\"\n", path ? path : "(null)");
+        return nullptr;
+    }
+
+    std::printf("openRead: \"%s\"\n", path ? path : "(null)");
 
     return new PicoFile(f);
 }

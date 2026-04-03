@@ -8,7 +8,7 @@ struct Texture : GAPI::Texture {
 
     #ifdef SPLIT_BY_TILE
 
-        #if defined(_GAPI_SW)
+        #if defined(_GAPI_SW) || defined (_GAPI_PICOCALC)
             Tile8 *tiles;
 
             Texture(Tile8 *tiles, int tilesCount) : GAPI::Texture(256, 256, 1, OPT_PROXY) {
@@ -53,7 +53,7 @@ struct Texture : GAPI::Texture {
         #endif
 
         void bindTile(uint16 tile, uint16 clut) {
-        #if defined(_GAPI_SW)
+        #if defined(_GAPI_SW) || defined (_GAPI_PICOCALC)
             bindTileIndices(tiles + tile);
         #elif defined(_GAPI_GU)
             bindTileCLUT(tiles + tile, cluts + clut);
@@ -76,7 +76,7 @@ struct Texture : GAPI::Texture {
 
     Texture(int width, int height, int depth, TexFormat format, uint32 opt = 0, void *data = NULL) : GAPI::Texture(width, height, depth, opt) {
         #ifdef SPLIT_BY_TILE
-            #if !defined(_GAPI_SW) && !defined(_GAPI_GU)
+            #if !defined(_GAPI_SW) && !defined(_GAPI_PICOCALC) && !defined(_GAPI_GU)
                 memset(this->tiles, 0, sizeof(tiles));
             #endif
         #endif
@@ -135,7 +135,7 @@ struct Texture : GAPI::Texture {
     }
 
     virtual ~Texture() {
-        #if !defined(_GAPI_SW) && !defined(_GAPI_GU)
+        #if !defined(_GAPI_SW) && !defined(_GAPI_PICOCALC) && !defined(_GAPI_GU)
             #ifdef SPLIT_BY_TILE
                 for (int i = 0; i < COUNT(tiles); i++)
                     delete tiles[i];

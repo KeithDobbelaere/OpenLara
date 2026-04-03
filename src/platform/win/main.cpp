@@ -408,8 +408,9 @@ HWND hWnd;
         const BITMAPINFO bmi = { sizeof(BITMAPINFOHEADER), Core::width, -Core::height, 1, sizeof(GAPI::ColorSW) * 8, BI_RGB, 0, 0, 0, 0, 0 };
         SetDIBitsToDevice(hDC, 0, 0, Core::width, Core::height, 0, 0, 0, Core::height, GAPI::swColor, &bmi, DIB_RGB_COLORS);
     }
-#elif _GAPI_PICOCALC
+    #elif _GAPI_PICOCALC
     static BITMAPINFO g_picoBMI;
+    static HDC g_picoDC = NULL;
 
     static void ContextCreate() {
         memset(&g_picoBMI, 0, sizeof(g_picoBMI));
@@ -417,10 +418,20 @@ HWND hWnd;
         g_picoBMI.bmiHeader.biPlanes = 1;
         g_picoBMI.bmiHeader.biBitCount = 32;
         g_picoBMI.bmiHeader.biCompression = BI_RGB;
+
+        g_picoDC = GetDC(hWnd);
+
+        RECT rc;
+        GetClientRect(hWnd, &rc);
+        Core::width = rc.right - rc.left;
+        Core::height = rc.bottom - rc.top;
     }
 
     static void ContextResize() {
-        // nothing needed; we size from the software buffer each frame
+        RECT rc;
+        GetClientRect(hWnd, &rc);
+        Core::width = rc.right - rc.left;
+        Core::height = rc.bottom - rc.top;
     }
 
     static void ContextSwap() {
@@ -428,7 +439,7 @@ HWND hWnd;
         const int srcW = GAPI::getPresentWidth();
         const int srcH = GAPI::getPresentHeight();
 
-        if (!pixels || srcW <= 0 || srcH <= 0)
+        if (!g_picoDC)
             return;
 
         RECT rc;
@@ -438,6 +449,15 @@ HWND hWnd;
         const int dstH = rc.bottom - rc.top;
         if (dstW <= 0 || dstH <= 0)
             return;
+
+        if (!pixels || srcW <= 0 || srcH <= 0)
+            return;
+
+        g_picoBMI.bmiHeader.biWidth = srcW;
+        g_picoBMI.bmiHeader.biHeight = -srcH; // top-down
+        g_picoBMI.bmiHeader.biSizeImage = srcW * srcH * 4;
+
+        SetStretchBltMode(g_picoDC, COLORONCOLOR);
 
         int blitW = dstW;
         int blitH = (dstW * srcH) / srcW;
@@ -450,15 +470,8 @@ HWND hWnd;
         const int blitX = (dstW - blitW) / 2;
         const int blitY = (dstH - blitH) / 2;
 
-        g_picoBMI.bmiHeader.biWidth = srcW;
-        g_picoBMI.bmiHeader.biHeight = -srcH; // top-down
-
-        HDC dc = GetDC(hWnd);
-
-        PatBlt(dc, 0, 0, dstW, dstH, BLACKNESS);
-
-        StretchDIBits(
-            dc,
+        int ret = StretchDIBits(
+            g_picoDC,
             blitX, blitY, blitW, blitH,
             0, 0, srcW, srcH,
             pixels,
@@ -467,12 +480,27 @@ HWND hWnd;
             SRCCOPY
         );
 
-        ReleaseDC(hWnd, dc);
+        if (ret == 0 || ret == GDI_ERROR) {
+            // fallback: unscaled 1:1 blit near the top-left
+            SetDIBitsToDevice(
+                g_picoDC,
+                80, 0,
+                srcW, srcH,
+                0, 0,
+                0, srcH,
+                pixels,
+                &g_picoBMI,
+                DIB_RGB_COLORS
+            );
+        }
     }
 
     static void ContextDelete() {
+        if (g_picoDC) {
+            ReleaseDC(hWnd, g_picoDC);
+            g_picoDC = NULL;
+        }
     }
-
 #elif _GAPI_GL
     HDC   hDC;
     HGLRC hRC;
@@ -663,27 +691,6 @@ HWND hWnd;
     }
 #endif
 
-#ifdef _NAPI_SOCKET
-char command[256];
-
-void parseCommand(char *cmd) {
-    NAPI::Peer peer;
-    int pos = 0;
-    for (int i = 0; i < strlen(cmd); i++)
-        if (cmd[i] == ':') {
-            cmd[i] = 0;
-            pos = i + 1;
-            break;
-        }
-    peer.ip = inet_addr(cmd);
-    peer.port = htons(atoi(&cmd[pos]));
-    cmd[pos - 1] = ':';
-
-    LOG("join %s:%d\n", inet_ntoa(*(in_addr*)&peer.ip), ntohs(peer.port));
-    Network::joinGame(peer);
-}
-#endif
-
 int checkLanguage() {
     LANGID id = GetUserDefaultUILanguage() & 0xFF;
     int str = STR_LANG_EN;
@@ -729,20 +736,6 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         // keyboard
         case WM_CHAR       :
         case WM_SYSCHAR    :
-            #ifdef _NAPI_SOCKET
-            if (wParam == VK_RETURN) {
-                parseCommand(command);
-                //command[0] = 0;
-            } else if ((wParam >= '0' && wParam <= '9') || wParam == ':' || wParam == '.') {
-                int len = strlen(command);
-                command[len] = wParam;
-                command[len + 1] = 0;
-            } else if (wParam == 8) {
-                int len = strlen(command);
-                if (len > 0)
-                    command[len - 1] = 0;
-            }
-            #endif
             break;
         case WM_KEYDOWN    :
         case WM_KEYUP      :
@@ -822,232 +815,8 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
     return 0;
 }
 
-//VR Support
-#ifdef VR_SUPPORT
-// TODO: fix depth precision
-// TODO: fix water surface rendering
-// TODO: fix clipping
-// TODO: add MSAA support for render targets
-// TODO: add IK for arms
-// TODO: controls (WIP)
-
-#include "libs/openvr/openvr.h"
-
-vr::IVRSystem *hmd; // vrContext
-vr::IVRRenderModels* rm; // not currently in use
-vr::TrackedDevicePose_t tPose[vr::k_unMaxTrackedDeviceCount];
-//eye textures(eventually)
-
-//action handles
-vr::VRActionHandle_t VRcLeft      = vr::k_ulInvalidActionHandle;
-vr::VRActionHandle_t VRcRight     = vr::k_ulInvalidActionHandle;
-vr::VRActionHandle_t VRcUp        = vr::k_ulInvalidActionHandle;
-vr::VRActionHandle_t VRcDown      = vr::k_ulInvalidActionHandle;
-
-vr::VRActionHandle_t VRcJump      = vr::k_ulInvalidActionHandle;
-vr::VRActionHandle_t VRcWalk      = vr::k_ulInvalidActionHandle;
-vr::VRActionHandle_t VRcAction    = vr::k_ulInvalidActionHandle;
-vr::VRActionHandle_t VRcWeapon    = vr::k_ulInvalidActionHandle;
-vr::VRActionHandle_t VRcRoll      = vr::k_ulInvalidActionHandle;
-vr::VRActionHandle_t VRcLook      = vr::k_ulInvalidActionHandle;
-vr::VRActionHandle_t VRcInventory = vr::k_ulInvalidActionHandle;
-vr::VRActionHandle_t VRcStart     = vr::k_ulInvalidActionHandle;
-
-vr::VRActionSetHandle_t m_actionsetDemo = vr::k_ulInvalidActionSetHandle;
-
-vr::VRInputValueHandle_t m_leftHand  = vr::k_ulInvalidInputValueHandle;
-vr::VRInputValueHandle_t m_rightHand = vr::k_ulInvalidInputValueHandle;
-
-//only in select TR games
-vr::VRActionHandle_t VRcDuck = vr::k_ulInvalidActionHandle;
-vr::VRActionHandle_t VRcDash = vr::k_ulInvalidActionHandle;
-//
-
-vr::VRActionSetHandle_t m_actionsetTR = vr::k_ulInvalidActionSetHandle;
-
-void vrInit() {
-    vr::VR_InitLibrary("openvr_api.dll");
-
-    vr::EVRInitError eError = vr::VRInitError_None;
-    hmd = vr::VR_Init(&eError, vr::VRApplication_Scene);
-    //rm = vr::VRRenderModels(); // initialize render models interface
-
-    if (eError != vr::VRInitError_None) {
-        hmd = NULL;
-        LOG("! unable to init VR runtime: %s\n", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
-        return;
-    }
-
-    if (!vr::VRCompositor()) {
-        vr::VR_Shutdown();
-        LOG("! compositor initialization failed\n");
-        return;
-    }
-}
-
-void vrInitTargets() {
-    if (!hmd) return;
-    uint32_t width, height;
-    hmd->GetRecommendedRenderTargetSize(&width, &height);
-    Core::eyeTex[0] = new Texture(width, height, 1, TexFormat::FMT_RGBA, OPT_TARGET);
-    Core::eyeTex[1] = new Texture(width, height, 1, TexFormat::FMT_RGBA, OPT_TARGET);
-}
-
-void vrFree() {
-    if (!hmd) return;
-    vr::VR_Shutdown();
-    hmd = NULL;
-    Input::hmd.ready = false;
-    delete Core::eyeTex[0];
-    delete Core::eyeTex[1];
-    Core::eyeTex[0] = Core::eyeTex[1] = NULL;
-}
-
-mat4 convToMat4(const vr::HmdMatrix44_t &m) {
-    return mat4(m.m[0][0], m.m[1][0], m.m[2][0], m.m[3][0],
-                m.m[0][1], m.m[1][1], m.m[2][1], m.m[3][1],
-                m.m[0][2], m.m[1][2], m.m[2][2], m.m[3][2],
-                m.m[0][3], m.m[1][3], m.m[2][3], m.m[3][3]);
-}
-
-mat4 convToMat4(const vr::HmdMatrix34_t &m) {
-    return mat4(m.m[0][0], m.m[1][0], m.m[2][0], 0.0f,
-                m.m[0][1], m.m[1][1], m.m[2][1], 0.0f,
-                m.m[0][2], m.m[1][2], m.m[2][2], 0.0f,
-                m.m[0][3], m.m[1][3], m.m[2][3], 1.0f);
-}
-//utility function for reading digital state
-bool GetDigitalActionState(vr::VRActionHandle_t action, vr::VRInputValueHandle_t *pDevicePath = nullptr)
-{
-    vr::InputDigitalActionData_t actionData;
-    vr::VRInput()->GetDigitalActionData(action, &actionData, sizeof(actionData), vr::k_ulInvalidInputValueHandle);
-    if (pDevicePath) {
-        *pDevicePath = vr::k_ulInvalidInputValueHandle;
-        if (actionData.bActive) {
-            vr::InputOriginInfo_t originInfo;
-            if (vr::VRInputError_None == vr::VRInput()->GetOriginTrackedDeviceInfo(actionData.activeOrigin, &originInfo, sizeof(originInfo))) {
-                *pDevicePath = originInfo.devicePath;
-            }
-        }
-    }
-    return actionData.bActive && actionData.bState;
-}
-
-void vrUpdate() {
-    if (!hmd) return;
-
-    vr::VREvent_t event;
-
-    while (hmd->PollNextEvent(&event, sizeof(event))) {
-        switch (event.eventType) {
-            case vr::VREvent_TrackedDeviceActivated:
-                break;
-            case vr::VREvent_TrackedDeviceDeactivated:
-                Input::reset();
-                break;
-            case vr::VREvent_TrackedDeviceUpdated:
-                break;
-        }
-    }
-
-    vr::VRCompositor()->WaitGetPoses(tPose, vr::k_unMaxTrackedDeviceCount, NULL, 0);
-
-    for (int id = 0; id < vr::k_unMaxTrackedDeviceCount; id++) {
-        vr::TrackedDevicePose_t &pose = tPose[id];
-
-        if (!pose.bPoseIsValid) {
-            continue;
-        }
-
-        switch (hmd->GetTrackedDeviceClass(id)) {
-            case vr::TrackedDeviceClass_HMD : {
-                mat4 pL = convToMat4(hmd->GetProjectionMatrix(vr::Eye_Left,  8.0f, 45.0f * 1024.0f));
-                mat4 pR = convToMat4(hmd->GetProjectionMatrix(vr::Eye_Right, 8.0f, 45.0f * 1024.0f));
-
-                mat4 head = convToMat4(pose.mDeviceToAbsoluteTracking);
-                if (Input::hmd.zero.x == INF) {
-                    Input::hmd.zero = head.getPos();
-                }
-                head.setPos(head.getPos() - Input::hmd.zero);
-
-                mat4 vL = head * convToMat4(hmd->GetEyeToHeadTransform(vr::Eye_Left));
-                mat4 vR = head * convToMat4(hmd->GetEyeToHeadTransform(vr::Eye_Right));
-
-                vL.setPos(vL.getPos() * ONE_METER);
-                vR.setPos(vR.getPos() * ONE_METER);
-                Input::hmd.setView(pL, pR, vL, vR);
-
-                Input::hmd.head = head;
-                break;
-            }
-            case vr::TrackedDeviceClass_Controller : {
-                vr::VRControllerState_t state;
-                hmd->GetControllerState(id, &state, sizeof(state));
-
-                #define IS_DOWN(btn) ((state.ulButtonPressed & vr::ButtonMaskFromId(btn)) != 0)
-
-                if (!state.ulButtonPressed) {
-                 //   continue;
-                }
-
-                Input::setJoyDown(0, jkLeft,  IS_DOWN(vr::k_EButton_DPad_Left));
-                Input::setJoyDown(0, jkUp,    IS_DOWN(vr::k_EButton_DPad_Up));
-                Input::setJoyDown(0, jkRight, IS_DOWN(vr::k_EButton_DPad_Right));
-                Input::setJoyDown(0, jkDown,  IS_DOWN(vr::k_EButton_DPad_Down));
-
-                if (IS_DOWN(vr::k_EButton_Axis0)) {
-                     Input::setJoyPos(0, jkL, vec2(state.rAxis[0].x, -state.rAxis[0].y));
-                }
-
-                Input::setJoyDown(0, jkA, IS_DOWN(vr::k_EButton_Axis1) ? (state.rAxis[1].x > 0.5) : false);
-                Input::setJoyDown(0, jkY, IS_DOWN(vr::k_EButton_Grip));
-                Input::setJoyDown(0, jkX, IS_DOWN(vr::k_EButton_ApplicationMenu));
-
-                // TODO
-                switch (hmd->GetControllerRoleForTrackedDeviceIndex(id)) {
-                    case vr::TrackedControllerRole_LeftHand :
-                        // TODO
-                        break;
-                    case vr::TrackedControllerRole_RightHand :
-                        // TODO
-                        break;
-                    default : ;
-                }
-                break;
-
-                #undef IS_DOWN
-            }
-        }
-    }
-}
-
-void vrCompose() {
-    if (!hmd) return;
-    vr::Texture_t LTex = {(void*)(uintptr_t)Core::eyeTex[0]->ID, vr::TextureType_OpenGL, vr::ColorSpace_Gamma};
-    vr::VRCompositor()->Submit(vr::Eye_Left, &LTex);
-    vr::Texture_t RTex = {(void*)(uintptr_t)Core::eyeTex[1]->ID, vr::TextureType_OpenGL, vr::ColorSpace_Gamma};
-    vr::VRCompositor()->Submit(vr::Eye_Right, &RTex);
-}
-
-void osToggleVR(bool enable) {
-    if (enable) {
-        vrInit();
-        vrInitTargets();
-        Input::hmd.ready = hmd != NULL;
-        if (!hmd) {
-            Core::settings.detail.stereo = Core::Settings::STEREO_OFF;
-        }
-    } else {
-        vrFree();
-    }
-}
-
-#else
-
 void vrUpdate() {}
 void vrCompose() {}
-
-#endif // #ifdef VR_SUPPORT
 
 #ifdef _DEBUG
 int main(int argc, char** argv) {

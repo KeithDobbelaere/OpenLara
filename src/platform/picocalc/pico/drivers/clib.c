@@ -29,6 +29,8 @@ static void init(void)
         {
             files[i].is_open = 0;
         }
+
+        fat32_init();
         initialized = 1;
     }
 }
@@ -71,6 +73,7 @@ static int fat32_error_to_errno(fat32_error_t error)
 int _open(const char *filename, int oflag, ...)
 {
     fat32_error_t result;
+    printf("_open(\"%s\", oflag=%d)\n", filename ? filename : "(null)", oflag);
 
     init(); // Ensure files are initialized
 
@@ -86,12 +89,14 @@ int _open(const char *filename, int oflag, ...)
                     if ((result = fat32_create(&files[i], filename)) != FAT32_OK)
                     {
                         errno = fat32_error_to_errno(result);
+                        printf("_open FAILED errno=%d path=\"%s\"\n", errno, filename ? filename : "(null)");
                         return -1; // Failed to create file
                     }
                 }
                 else
                 {
                     errno = fat32_error_to_errno(result);
+                    printf("_open FAILED errno=%d path=\"%s\"\n", errno, filename ? filename : "(null)");
                     return -1; // Failed to open file
                 }
             }
@@ -99,6 +104,7 @@ int _open(const char *filename, int oflag, ...)
             {
                 fat32_close(&files[i]); // Close the file if it already exists
                 errno = EEXIST;              // File already exists and O_EXCL is set
+                printf("_open FAILED errno=%d path=\"%s\"\n", errno, filename ? filename : "(null)");
                 return -1;
             }
 
@@ -155,44 +161,62 @@ off_t _lseek(int fd, off_t offset, int whence)
 
     if ((fd & FD_FLAG_MASK) == 0)
     {
-        errno = EBADF; // Invalid file descriptor
+        errno = EBADF;
         return -1;
     }
 
-    fd &= ~FD_FLAG_MASK; // Clear the file descriptor flag
+    fd &= ~FD_FLAG_MASK;
 
     if (fd < 0 || fd >= MAX_OPEN_FILES || !files[fd].is_open)
     {
-        return -1; // Invalid file descriptor
+        errno = EBADF;
+        return -1;
     }
 
     fat32_file_t *file = &files[fd];
 
+    off_t newPos;
     if (whence == SEEK_SET)
     {
-        file->position = offset;
+        newPos = offset;
     }
     else if (whence == SEEK_CUR)
     {
-        file->position += offset;
+        newPos = (off_t)file->position + offset;
     }
     else if (whence == SEEK_END)
     {
-        file->position = file->file_size + offset;
+        newPos = (off_t)file->file_size + offset;
+    }
+    else
+    {
+        errno = EINVAL;
+        return -1;
     }
 
-    if ((result = fat32_seek(file, offset)) == FAT32_OK)
+    if (newPos < 0)
     {
-        return file->position; // Success
+        errno = EINVAL;
+        return -1;
+    }
+
+    result = fat32_seek(file, (uint32_t)newPos);
+    if (result == FAT32_OK)
+    {
+        file->position = (uint32_t)newPos;
+        printf("_lseek OK -> pos=%lu\n", (unsigned long)file->position);
+        return newPos;
     }
 
     errno = fat32_error_to_errno(result);
-    return -1; // Failure
+    printf("_lseek FAILED errno=%d\n", errno);
+    return -1;
 }
 
 int _read(int fd, char *buffer, int length)
 {
     fat32_error_t result;
+    printf("_read(fd=%d, length=%d)\n", fd, length);
 
     if (fd == 0)
     {
@@ -224,6 +248,7 @@ int _read(int fd, char *buffer, int length)
 
     if (bytes_read > 0)
     {
+        printf("_read OK bytes=%lu\n", (unsigned long)bytes_read);
         return bytes_read; // Return number of bytes read
     }
 
@@ -315,6 +340,10 @@ int _fstat(int fd, struct stat *buf)
     buf->st_mtime = 0;
     buf->st_ctime = 0;
     buf->st_ino = 0;
+    printf("_fstat(fd=%d) size=%lu mode=0x%lx\n",
+       fd,
+       (unsigned long)buf->st_size,
+       (unsigned long)buf->st_mode);
     return 0; // Success
 }
 

@@ -575,7 +575,7 @@ struct Level : IGame {
             Core::setFog(levelFogParams);
         }
 
-        #ifdef _GAPI_SW
+        #if defined (_GAPI_SW) || defined (_GAPI_PICOCALC)
             GAPI::setPalette(room.flags.water ? GAPI::swPaletteWater : GAPI::swPaletteColor);
             GAPI::setShading(true);
         #endif
@@ -619,7 +619,7 @@ struct Level : IGame {
             return;
         #endif
 
-        #ifdef _GAPI_SW
+        #if defined (_GAPI_SW) || defined (_GAPI_PICOCALC) 
             return;
         #endif
 
@@ -1598,7 +1598,7 @@ struct Level : IGame {
     void initTextures() {
     #ifndef SPLIT_BY_TILE
 
-        #if defined(_GAPI_SW) || defined(_GAPI_GU)
+        #if defined (_GAPI_SW) || defined (_GAPI_PICOCALC) || defined (_GAPI_GU)
             #error atlas packing is not allowed for this platform
         #endif
 
@@ -1749,7 +1749,7 @@ struct Level : IGame {
     #else
         ASSERT(level.tilesCount);
 
-        #if defined(_GAPI_SW)
+        #if defined(_GAPI_SW) || defined (_GAPI_PICOCALC)
             atlasRooms   =
             atlasObjects =
             atlasSprites =
@@ -1803,7 +1803,7 @@ struct Level : IGame {
             delete[] tiles;
         #endif
 
-        #ifndef _GAPI_SW
+        #if !defined (_GAPI_SW) && !defined (_GAPI_PICOCALC)
         for (int i = 0; i < level.objectTexturesCount; i++) {
             TR::TextureInfo &t = level.objectTextures[i];
 
@@ -3439,7 +3439,7 @@ struct Level : IGame {
     void renderUI() {
         if (inventory->titleTimer > 1.0f || level.isTitle()) return;
 
-        #ifdef _GAPI_SW
+        #if defined (_GAPI_SW) || defined (_GAPI_PICOCALC)
             GAPI::setPalette(GAPI::swPaletteColor);
             GAPI::setShading(false);
         #endif

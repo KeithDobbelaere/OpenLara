@@ -3475,7 +3475,16 @@ namespace TR {
             readSoundMap(stream);
             readSoundOffsets(stream);
 
+        #if !NO_SOUND
             new Stream(getGameSoundsFile(version), sfxLoadAsync, this);
+        #else
+            soundOffsetsCount = 0;
+            soundOffsets = NULL;
+            soundSize = NULL;
+            soundDataSize = 0;
+            soundData = NULL;
+            LOG("SKIPPED external game sounds file\n");
+        #endif
         }
 
         void loadTR2_PSX (Stream &stream) {

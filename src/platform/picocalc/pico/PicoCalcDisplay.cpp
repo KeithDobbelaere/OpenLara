@@ -4,6 +4,7 @@
 #include "hardware/gpio.h"
 #include "hardware/dma.h"
 #include <cstring>
+#include <cstdio>
 
 namespace GAPI {
     const uint32_t* getPresentBuffer();
@@ -18,7 +19,7 @@ static int  g_dma_tx = -1;
 static dma_channel_config g_dma_cfg;
 
 bool PicoCalcDisplay::s_serialOutputEnabled = false;
-uint16_t PicoCalcDisplay::s_present565[PicoCalcDisplay::RenderW * PicoCalcDisplay::RenderH];
+uint16_t PicoCalcDisplay::s_present565[PicoCalcDisplay::RenderW];
 
 PicoCalcDisplay::PicoCalcDisplay() {}
 PicoCalcDisplay::~PicoCalcDisplay() {}
@@ -119,17 +120,41 @@ void PicoCalcDisplay::presentPicoCalcFrame() {
     const int srcW = GAPI::getPresentWidth();
     const int srcH = GAPI::getPresentHeight();
 
+    if (s_serialOutputEnabled && src && srcW > 0 && srcH > 0) {
+        static uint64_t lastDumpUs = 0;
+        const uint64_t now = time_us_64();
+
+        if (now - lastDumpUs >= 1000000) {
+            lastDumpUs = now;
+
+            const uint32_t p0 = src[0];
+            const uint32_t p1 = src[(srcW > 1) ? 1 : 0];
+            const uint32_t pm = src[(srcW * srcH) / 2];
+            const uint32_t pl = src[srcW * srcH - 1];
+
+            std::printf("GAPI buf %dx%d p0=%08lx p1=%08lx pm=%08lx pl=%08lx\n",
+                        srcW, srcH,
+                        (unsigned long)p0,
+                        (unsigned long)p1,
+                        (unsigned long)pm,
+                        (unsigned long)pl);
+        }
+    }
+
     if (!src || srcW != RenderW || srcH != RenderH)
         return;
 
-    const int count = srcW * srcH;
-    for (int i = 0; i < count; ++i) {
-        s_present565[i] = color32To565(src[i]);
-    }
-
     lcdFillRectBlack(0, 0, W, PresentY);
     lcdFillRectBlack(0, PresentY + PresentH, W, H - (PresentY + PresentH));
-    drawBitmap565(PresentX, PresentY, RenderW, RenderH, s_present565);
+
+    for (int y = 0; y < RenderH; ++y) {
+        const uint32_t* srcRow = src + y * RenderW;
+        for (int x = 0; x < RenderW; ++x) {
+            s_present565[x] = color32To565(srcRow[x]);
+        }
+
+        drawBitmap565(PresentX, PresentY + y, RenderW, 1, s_present565);
+    }
 }
 
 void PicoCalcDisplay::initIfNeeded() {
@@ -157,6 +182,13 @@ void PicoCalcDisplay::initIfNeeded() {
     channel_config_set_dreq(&g_dma_cfg, spi_get_dreq(spi1, true));
 
     lcdFillBlack();
+
+    if (s_serialOutputEnabled) {
+    std::printf("PicoCalcDisplay init SPI:%u Render:%dx%d Present:%d,%d %dx%d\n",
+                    g_baud,
+                    RenderW, RenderH,
+                    PresentX, PresentY, PresentW, PresentH);
+    }
 
     inited_ = true;
 }

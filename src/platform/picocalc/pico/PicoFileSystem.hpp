@@ -8,10 +8,13 @@ class PicoFile {
 public:
     explicit PicoFile(FILE* f) : f_(f) {}
 
+    bool valid() const { return f_ != nullptr; }
+
     bool read(void* dst, size_t bytes, size_t& outRead);
     bool write(const void* src, size_t bytes, size_t& outWritten);
     bool seek(size_t absOffset);
     size_t tell() const;
+    size_t size() const;
 
     // close() closes the FILE and deletes this wrapper.
     void close();
@@ -19,7 +22,7 @@ public:
 private:
     FILE* f_ = nullptr;
 };
-    
+
 class PicoFileSystem {
 public:
     bool init();

@@ -28,29 +28,32 @@ project(OpenLara-PicoCalc C CXX ASM)
 
 pico_sdk_init()
 
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/pico/drivers/rp2040-psram rp2040-psram)
+
 set(TARGET_NAME OpenLara-PicoCalc)
 
 add_executable(${TARGET_NAME}
     main.cpp
-    app/App.cpp
-    game/Game.cpp
-    render/Font8x8.cpp
     pico/PicoInput.cpp
-    pico/PicoThreads.cpp
-    pico/PicoPlatform.cpp
     pico/PicoFileSystem.cpp
     pico/PicoCalcDisplay.cpp
     pico/PicoSouthbridge.cpp
+    pico/Psram.cpp
 
     pico/drivers/clib.c
     pico/drivers/fat32.c
     pico/drivers/sdcard.c
     pico/drivers/southbridge.c
 
+    pico/drivers/rp2040-psram/psram_spi.c
 
     ../../libs/tinf/tinflate.c
     ../../libs/minimp3/minimp3.cpp
     ../../libs/stb_vorbis/stb_vorbis.c
+)
+
+pico_generate_pio_header(${TARGET_NAME}
+    ${CMAKE_CURRENT_LIST_DIR}/pico/drivers/rp2040-psram/psram_spi.pio
 )
 
 pico_set_program_name(${TARGET_NAME} "OpenLara-PicoCalc")
@@ -60,10 +63,16 @@ target_compile_features(${TARGET_NAME} PRIVATE cxx_std_20)
 
 target_compile_definitions(${TARGET_NAME} PRIVATE
     PICO_CLOCK_ADJUST_PERI_CLOCK_WITH_SYS_CLOCK=1
-
     __PICOCALC__
-    # NO_SOUND
-    #_GAPI_PICOCALC
+    NO_SOUND=1
+
+    PSRAM_MUTEX=1
+    #PSRAM_SPINLOCK=0
+    PSRAM_ASYNC=0
+    PSRAM_PIN_CS=20
+    PSRAM_PIN_SCK=21
+    PSRAM_PIN_MOSI=2
+    PSRAM_PIN_MISO=3
 )
 
 target_compile_options(${TARGET_NAME} PRIVATE
@@ -72,6 +81,8 @@ target_compile_options(${TARGET_NAME} PRIVATE
 
     $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
     $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
+    $<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-enum-enum-conversion>
+    $<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-enum-float-conversion>
 )
 
 target_include_directories(${TARGET_NAME} PRIVATE
@@ -95,9 +106,10 @@ target_link_libraries(${TARGET_NAME}
     hardware_sync
     hardware_timer
     hardware_clocks
+    rp2040-psram
 )
 
-pico_enable_stdio_uart(${TARGET_NAME} 0)
-pico_enable_stdio_usb(${TARGET_NAME} 1)
+pico_enable_stdio_uart(${TARGET_NAME} 1)
+pico_enable_stdio_usb(${TARGET_NAME} 0)
 
 pico_add_extra_outputs(${TARGET_NAME})

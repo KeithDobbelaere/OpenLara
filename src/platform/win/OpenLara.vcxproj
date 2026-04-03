@@ -63,7 +63,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>NOMINMAX;_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>__PICOCALC__;__PICOCALC____PICOCALC____PICOCALC__NOMINMAX;_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <FloatingPointModel>Strict</FloatingPointModel>
       <AdditionalOptions>
       </AdditionalOptions>
@@ -83,7 +83,7 @@
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>MINIMAL;NOMINMAX;_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>__PICOCALC__;__PICOCALC____PICOCALC____PICOCALC__MINIMAL;NOMINMAX;_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ExceptionHandling>false</ExceptionHandling>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -126,15 +126,8 @@
     <ClInclude Include="..\..\frustum.h" />
     <ClInclude Include="..\..\game.h" />
     <ClInclude Include="..\..\gameflow.h" />
-    <ClInclude Include="..\..\gapi\c3d.h" />
-    <ClInclude Include="..\..\gapi\d3d11.h" />
-    <ClInclude Include="..\..\gapi\d3d8.h" />
-    <ClInclude Include="..\..\gapi\d3d9.h" />
-    <ClInclude Include="..\..\gapi\gl.h" />
-    <ClInclude Include="..\..\gapi\gu.h" />
-    <ClInclude Include="..\..\gapi\gxm.h" />
+    <ClInclude Include="..\..\gapi\picocalc.h" />
     <ClInclude Include="..\..\gapi\sw.h" />
-    <ClInclude Include="..\..\gapi\vk.h" />
     <ClInclude Include="..\..\gltf.h" />
     <ClInclude Include="..\..\json.h" />
     <ClInclude Include="..\..\lang.h" />

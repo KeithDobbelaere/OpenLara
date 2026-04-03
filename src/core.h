@@ -34,9 +34,13 @@
 
     #undef OS_PTHREAD_MT
 #elif __PICOCALC__
-    //#define _OS_WIN 1
+    #define _OS_WIN 1
     #define _GAPI_PICOCALC 1
-    //#include <windows.h>
+    #define NOMINMAX
+    #include <windows.h>
+    //#define OL_STREAM_ALLOC_TRACE 1
+    //#define OL_STREAM_ALLOC_TRACE_MIN (32 * 1024)
+    //#define OL_PICO_SKIP_TILES 1
 
     #undef OS_PTHREAD_MT
 
@@ -51,13 +55,13 @@
     //#define _GAPI_SW     1
 
     //#define _NAPI_SOCKET
-
+    #define NOMINMAX
     #include <windows.h>
 
     #undef OS_PTHREAD_MT
 
     #ifdef _GAPI_GL
-        #define VR_SUPPORT
+        //#define VR_SUPPORT
     #endif
 
     #define INV_VIBRATION

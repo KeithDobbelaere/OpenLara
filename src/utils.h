@@ -9,83 +9,83 @@
 //#define TEST_SLOW_FIO
 
 #ifdef _DEBUG
-    #if defined(_OS_WP8)
-        #define debugBreak() /* TODO */
-    #elif defined(_OS_LINUX) || defined(_OS_RPI) || defined(_OS_CLOVER)
-        #define debugBreak() raise(SIGTRAP);
-    #elif defined(_OS_3DS)
-        #define debugBreak() svcBreak(USERBREAK_ASSERT);
-    #else
-        #define debugBreak() _asm { int 3 }
-    #endif
+#if defined(_OS_WP8)
+#define debugBreak() /* TODO */
+#elif defined(_OS_LINUX) || defined(_OS_RPI) || defined(_OS_CLOVER)
+#define debugBreak() raise(SIGTRAP);
+#elif defined(_OS_3DS)
+#define debugBreak() svcBreak(USERBREAK_ASSERT);
+#else
+#define debugBreak() _asm { int 3 }
+#endif
 
-    #define ASSERT(expr) if (!(expr)) { LOG("ASSERT:\n  %s:%d\n  %s => %s\n", __FILE__, __LINE__, __FUNCTION__, #expr); debugBreak(); }
-    #define ASSERTV(expr) ASSERT(expr)
+#define ASSERT(expr) if (!(expr)) { LOG("ASSERT:\n  %s:%d\n  %s => %s\n", __FILE__, __LINE__, __FUNCTION__, #expr); debugBreak(); }
+#define ASSERTV(expr) ASSERT(expr)
 
-    #ifndef _OS_ANDROID
-        #define LOG printf
-    #endif
+#ifndef _OS_ANDROID
+#define LOG printf
+#endif
 
-    #if defined(_OS_XBOX) || defined(_OS_XB1) || defined(_OS_WP8)
-        #define MAX_LOG_LENGTH 1024
+#if defined(_OS_XBOX) || defined(_OS_XB1) || defined(_OS_WP8)
+#define MAX_LOG_LENGTH 1024
 
-        #undef LOG
-        void LOG(const char *format, ...) {
-            char str[MAX_LOG_LENGTH];
-            va_list arglist;
-            va_start(arglist, format);
-            _vsnprintf(str, MAX_LOG_LENGTH, format, arglist);
-            va_end(arglist);
-            OutputDebugStringA(str);
-        }
-    #endif
+#undef LOG
+void LOG(const char* format, ...) {
+    char str[MAX_LOG_LENGTH];
+    va_list arglist;
+    va_start(arglist, format);
+    _vsnprintf(str, MAX_LOG_LENGTH, format, arglist);
+    va_end(arglist);
+    OutputDebugStringA(str);
+}
+#endif
 
 #else
 
-    #define ASSERT(expr)
-    #define ASSERTV(expr) (expr) ? 1 : 0
+#define ASSERT(expr)
+#define ASSERTV(expr) (expr) ? 1 : 0
 
-    #ifdef PROFILE
-        #ifdef _OS_LINUX
-            #define LOG(...) printf(__VA_ARGS__); fflush(stdout)
-        #else
-            #define LOG(...) printf(__VA_ARGS__)
-        #endif
-    #else
-        #define LOG printf
-    #endif
+#ifdef PROFILE
+#ifdef _OS_LINUX
+#define LOG(...) printf(__VA_ARGS__); fflush(stdout)
+#else
+#define LOG(...) printf(__VA_ARGS__)
+#endif
+#else
+#define LOG printf
+#endif
 #endif
 
 #ifdef _OS_PSV
-    #undef LOG
-    #define LOG(...) psvDebugScreenPrintf(__VA_ARGS__)
+#undef LOG
+#define LOG(...) psvDebugScreenPrintf(__VA_ARGS__)
 #endif
 
 #ifdef _OS_ANDROID
-    #include <android/log.h>
-    #undef LOG
-    #define LOG(...) __android_log_print(ANDROID_LOG_INFO,"OpenLara",__VA_ARGS__)
+#include <android/log.h>
+#undef LOG
+#define LOG(...) __android_log_print(ANDROID_LOG_INFO,"OpenLara",__VA_ARGS__)
 #endif
 
 
 #ifdef _OS_PSP
-    extern "C" {
+extern "C" {
     // pspmath.h
-        extern float vfpu_sinf(float x);
-        extern float vfpu_cosf(float x);
-        extern float vfpu_atan2f(float x, float y);
-        extern void  vfpu_sincos(float r, float *s, float *c);
-    }
+    extern float vfpu_sinf(float x);
+    extern float vfpu_cosf(float x);
+    extern float vfpu_atan2f(float x, float y);
+    extern void  vfpu_sincos(float r, float* s, float* c);
+}
 
-    #define sinf(x)         vfpu_sinf(x)
-    #define cosf(x)         vfpu_cosf(x)
-    #define atan2f(x, y)    vfpu_atan2f(x, y)
-    #define sincos(a, s, c) vfpu_sincos(a, s, c)
+#define sinf(x)         vfpu_sinf(x)
+#define cosf(x)         vfpu_cosf(x)
+#define atan2f(x, y)    vfpu_atan2f(x, y)
+#define sincos(a, s, c) vfpu_sincos(a, s, c)
 #else
-    void sincos(float r, float *s, float *c) {
-        *s = sinf(r);
-        *c = cosf(r);
-    }
+void sincos(float r, float* s, float* c) {
+    *s = sinf(r);
+    *c = cosf(r);
+}
 #endif
 
 #define DECL_ENUM(v) v,
@@ -842,7 +842,7 @@ struct mat4 {
         m.identity();
         m.setPos(offset);
         *this = *this * m;
-    };
+    }
 
     void scale(const vec3 &factor) {
         mat4 m;
@@ -2275,12 +2275,41 @@ public:
     }
 
     template <typename T>
-    inline T* read(T *&a, int count) {
-        if (count) {
-            a = new T[count];
-            raw(a, count * sizeof(T));
-        } else
+    inline T* read(T*& a, int count) {
+        if (count <= 0) {
             a = NULL;
+            return a;
+        }
+
+        const size_t bytes = size_t(count) * sizeof(T);
+
+#if OL_STREAM_ALLOC_TRACE
+        if (bytes >= OL_STREAM_ALLOC_TRACE_MIN) {
+            LOG("Stream alloc: file=\"%s\" count=%d elem=%u bytes=%u pos=%d\n",
+                name ? name : "(null)",
+                count,
+                unsigned(sizeof(T)),
+                unsigned(bytes),
+                pos);
+        }
+#endif
+
+        a = static_cast<T*>(malloc(bytes));
+        if (!a) {
+            LOG("Stream alloc FAILED: file=\"%s\" count=%d elem=%u bytes=%u pos=%d\n",
+                name ? name : "(null)",
+                count,
+                unsigned(sizeof(T)),
+                unsigned(bytes),
+                pos);
+
+            // Keep the stream position consistent so follow-on logging stays meaningful.
+            seek(int(bytes));
+            a = NULL;
+            return a;
+        }
+
+        raw(a, int(bytes));
         return a;
     }
 

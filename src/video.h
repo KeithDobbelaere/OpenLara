@@ -792,9 +792,9 @@ struct Video {
 
         int   curVideoChunk;
         int   curAudioChunk;
-
+    #ifndef NO_SOUND
         Sound::XA *audioDecoder;
-
+    #endif
         struct {
             uint8 code;
             uint8 length;
@@ -802,7 +802,10 @@ struct Video {
 
         bool hasSyncHeader;
 
-        STR(Stream *stream) : Decoder(stream), videoChunksCount(0), audioChunksCount(0), curVideoChunk(-1), curAudioChunk(-1), audioDecoder(NULL)
+        STR(Stream *stream) : Decoder(stream), videoChunksCount(0), audioChunksCount(0), curVideoChunk(-1), curAudioChunk(-1)
+        #ifndef NO_SOUND
+            , audioDecoder(NULL)
+        #endif
         {
             memset(videoChunks, 0, sizeof(videoChunks));
             memset(audioChunks, 0, sizeof(audioChunks));
@@ -843,18 +846,18 @@ struct Video {
             channels = 2;
             freq     = 37800;
 
-        #ifdef NO_SOUND
-            audioDecoder = NULL;
-        #else
+        #ifndef NO_SOUND
             audioDecoder = new Sound::XA(this, audioNextBlockCallback);
         #endif
         }
 
         virtual ~STR()
         {
+        #ifndef NO_SOUND
             OS_LOCK(Sound::lock);
             audioDecoder->stream = NULL;
             delete audioDecoder;
+        #endif
         }
 
         void buildLUT(uint8 *LUT, int start, int end, int shift)
@@ -1277,20 +1280,24 @@ struct Video {
 
         bool getNextAudioStream()
         {
-            curAudioChunk++;
-            while (curAudioChunk >= audioChunksCount)
-            {
-                if (!nextChunk())
+            #ifdef NO_SOUND
+                return false;
+            #else
+                curAudioChunk++;
+                while (curAudioChunk >= audioChunksCount)
                 {
-                    curAudioChunk--;
-                    return false;
+                    if (!nextChunk())
+                    {
+                        curAudioChunk--;
+                        return false;
+                    }
                 }
-            }
 
-            AudioChunk *chunk = audioChunks + (curAudioChunk % MAX_CHUNKS);
-            ASSERT(chunk->size > 0);
-            audioDecoder->processSector(chunk->data);
-            return true;
+                AudioChunk *chunk = audioChunks + (curAudioChunk % MAX_CHUNKS);
+                ASSERT(chunk->size > 0);
+                audioDecoder->processSector(chunk->data);
+                return true;
+            #endif
         }
 
         static bool audioNextBlockCallback(void* userData)
@@ -1300,7 +1307,7 @@ struct Video {
 
         virtual int decode(Sound::Frame *frames, int count)
         {
-        #ifdef NO_VIDEO
+        #if defined(NO_VIDEO) || defined(NO_SOUND)
             return 0;
         #else
             if (!audioDecoder) return 0;

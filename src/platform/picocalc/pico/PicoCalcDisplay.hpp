@@ -44,7 +44,7 @@ private:
 
     static bool s_serialOutputEnabled;
 
-    static uint16_t s_present565[RenderW * RenderH];
+    static uint16_t s_present565[RenderW];
 
 private:
     void initIfNeeded();

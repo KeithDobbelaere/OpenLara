@@ -11,32 +11,45 @@ extern "C" {
 
 namespace ol {
 
-void PicoKeyboardInput::clearPressedBits() {
-    for (auto& w : pressedBits_) w = 0;
+void PicoKeyboardInput::clearEdgeBits() {
+    for (auto& w : pressedBits_) {
+        w = 0;
+    }
+    for (auto& w : releasedBits_) {
+        w = 0;
+    }
 }
 
 void PicoKeyboardInput::markPressed(uint8_t key) {
     pressedBits_[key >> 5] |= (1u << (key & 31));
 }
 
+void PicoKeyboardInput::markReleased(uint8_t key) {
+    releasedBits_[key >> 5] |= (1u << (key & 31));
+}
+
 void PicoKeyboardInput::init() {
     sb_init();
     keyDown_.fill(0);
-    clearPressedBits();
+    clearEdgeBits();
 }
 
 void PicoKeyboardInput::update() {
-    clearPressedBits();
+    clearEdgeBits();
 
     // Drain FIFO (cap avoids pathological loops if something goes wrong)
     for (int i = 0; i < 64; ++i) {
-        if (!sb_available()) break;
+        if (!sb_available()) {
+            break;
+        }
 
-        const uint16_t ev = sb_read_keyboard();
-        const uint8_t st   = (uint8_t)(ev >> 8);
-        const uint8_t code = (uint8_t)(ev & 0xFF);
+        const uint16_t ev   = sb_read_keyboard();
+        const uint8_t st    = static_cast<uint8_t>(ev >> 8);
+        const uint8_t code  = static_cast<uint8_t>(ev & 0xFF);
 
-        if (st == 0) break;
+        if (st == 0) {
+            break;
+        }
 
         switch (st) {
             case KEY_STATE_PRESSED:
@@ -50,6 +63,7 @@ void PicoKeyboardInput::update() {
 
             case KEY_STATE_RELEASED:
                 keyDown_[code] = 0;
+                markReleased(code);
                 break;
 
             default:
