@@ -2,9 +2,9 @@
 
 ## What this is
 
-This fork is for exploring an OpenLara port to the ClockworkPi PicoCalc, with the Pico 2 as the main target.
+This fork is for exploring an OpenLara port to the ClockworkPi PicoCalc, with Pico 2 as the main target.
 
-At the moment, the goal is not to jump straight into a full port. The first step is to understand how OpenLara is put together, keep a known-good desktop build working, and then carve out a small, clean platform stub for PicoCalc work.
+The current goal is not a full port straight away. The first job is to get TR2 running through a Windows software backend, use that to understand the render path and content requirements, and then reduce the game to something PicoCalc can realistically handle.
 
 ## Current status
 
@@ -14,32 +14,63 @@ So far:
 - working branch created: `pico2-picocalc`
 - Windows build is up and running
 - TR2 is loading and playing correctly
+- software rendering path is now the main development path
 - the local content folder was renamed from `TR1_PSX` to `TR2_PC` so it actually reflects what is in it
 
 ## General approach
 
-The plan is to keep the Windows build around as a sanity check and reference point, but not to treat it as the eventual development target for PicoCalc.
+The Windows build is now the main working environment for this phase.
 
 The current direction is:
 
-- use the Windows build to study startup, content loading, and platform boundaries
-- inspect the existing platform backends
-- create a fresh, minimal PicoCalc-oriented platform stub instead of trying to twist one of the existing ports into shape too early
+- use the Windows software backend to study rendering, textures, and special-case paths
+- debug and iterate in Visual Studio
+- figure out what TR2 actually needs in order to run and look acceptable
+- reduce assets and runtime requirements there first
+- bring the reduced design back to PicoCalc later
 
-That still leaves an open question: whether the existing `rpi` port turns out to contain useful ideas or code worth borrowing. That has not been investigated yet.
+This is a better order than trying to solve platform bring-up, rendering, and content reduction on PicoCalc all at once.
 
-## Why a fresh stub still seems like the right direction
+## Why a fresh backend still makes sense
 
-My instinct is to avoid making a mess by forcing the new work into an existing backend before I understand what that backend is really doing.
+It still makes sense to keep PicoCalc-specific work isolated instead of forcing it into an existing backend too early.
 
-A fresh platform stub should make it easier to:
+That makes it easier to:
 
-- keep the PicoCalc-specific work isolated
-- see exactly what the platform layer needs to provide
-- avoid dragging in assumptions from desktop or Linux code that may not help on Pico 2
+- keep the PicoCalc work separate
+- see what the platform layer actually needs
+- avoid dragging in assumptions from desktop or Linux code that do not help on Pico 2
 - prototype one subsystem at a time
 
-That said, the existing `sdl2` and `rpi` ports are still likely to be useful as references.
+Existing backends like `sdl2`, `win`, `rpi`, and `sw` are still useful references, but they are references, not the end state.
+
+## Why the Windows software backend matters
+
+The Windows software backend is now doing more than just proving the backend compiles.
+
+It is the easiest place to:
+
+- inspect transforms, UVs, and texture behavior
+- debug 2D faces and special-case quads
+- understand dynamic RGBA texture use
+- see what the engine is really submitting
+- identify what assets and features can be reduced or removed
+
+That makes it the right place to shape the eventual PicoCalc target.
+
+## PSRAM note
+
+PicoCalc includes external PSRAM, but it should not be treated like ordinary directly mapped system RAM.
+
+It is not on the Pico 2 module's QSPI/XIP path, so it is better thought of as external storage with access overhead than as a transparent heap extension.
+
+That means:
+
+- hot runtime data should stay in internal SRAM
+- PSRAM is a better fit for larger cold or semi-cold blobs
+- code should not assume PSRAM-backed data can be used like ordinary pointer-friendly RAM without extra thought
+
+This matters for renderer and asset design.
 
 ## Local content setup
 
@@ -73,13 +104,12 @@ That includes:
 - any other files copied from the original game distribution
 
 The repo should only contain source, notes, and build/configuration changes.
-The full game, along with 1, 3, and 4 can be purchased from GOG for under $5.
 
 ## Things confirmed so far
 
 ### Game version selection
 
-OpenLara does not appear to use a simple build-time setting for "which Tomb Raider game to run."
+OpenLara does not appear to use a simple build-time setting for which Tomb Raider game to run.
 
 Instead, it looks at the files present in the content root and decides from there.
 
@@ -91,7 +121,7 @@ Examples from the source:
 - TR2 PSX: `DATA/ASSAULT.PSX`
 - TR4 PC: `data/angkor1.tr4`
 
-So naming a folder `TR2_PC` is just for my own clarity. The engine cares about the files inside it.
+So naming a folder `TR2_PC` is just for clarity. The engine cares about the files inside it.
 
 ### Windows content lookup
 
@@ -99,16 +129,18 @@ On the Windows build, the game content being used is currently controlled by the
 
 ## Files worth studying first
 
-These are the main files to keep coming back to while figuring out the platform boundary:
+These are still the main files to keep coming back to while figuring out the platform boundary and renderer behavior:
 
 - `src/platform/win/main.cpp`
 - `src/platform/sdl2/main.cpp`
 - `src/platform/rpi/main.cpp`
+- `src/gapi/sw.h`
+- `src/gapi/picocalc.h`
 - `src/core.h`
 - `src/gameflow.h`
 - `src/format.h`
 
-The goal is to figure out what the engine expects from the platform layer in terms of:
+The goal is to understand what the engine expects from the platform layer in terms of:
 
 - rendering
 - input
@@ -117,18 +149,30 @@ The goal is to figure out what the engine expects from the platform layer in ter
 - file/content access
 - save data / cache paths
 
+## Current priority
+
+The current priority is not "full game on PicoCalc."
+
+It is:
+
+1. keep TR2 working in the Windows software backend
+2. understand the texture and render paths
+3. identify special cases that need their own handling
+4. trim assets and runtime assumptions
+5. define a reduced target that PicoCalc could plausibly support
+
 ## Near-term to-do list
 
-1. Clean up ignore rules so local game data never gets pushed
-2. Commit the repo hygiene changes before starting real port work
-3. Read through the existing platform implementations, especially `rpi`
-4. Decide what the smallest possible PicoCalc platform stub should look like
-5. Start with a minimal bring-up target rather than "full game on hardware"
+1. Keep the Windows software backend stable enough to use as a test bed
+2. Continue cleaning up `_GAPI_PICOCALC` without turning it into `_GAPI_SW`
+3. Reduce assets and texture requirements where possible
+4. Keep local game data out of the repo
+5. Revisit PicoCalc bring-up once the reduced target is clearer
 
 ## Questions still open
 
-- How useful is the existing `rpi` backend going to be?
-- What is the smallest possible platform layer OpenLara can run on?
-- What parts of the engine are likely to be too heavy for a first PicoCalc attempt?
-- Is a no-audio / reduced-rendering prototype the right first milestone?
-- What should the PicoCalc content layout look like on-device?
+- How much of TR2 can be simplified before it stops being worth doing?
+- Which texture paths matter most for a playable reduced target?
+- Which systems should be cut entirely for a first PicoCalc attempt?
+- How much of the final renderer should stay slab-based and RGB565-first?
+- What is the cleanest way to separate hot SRAM data from colder external-storage-style data?
