@@ -34,6 +34,35 @@ namespace GAPI {
     uint8   swGradient[256];
     Tile8* curTile;
 
+    enum UVDecodeMode {
+        UVDECODE_TEXEL_INT,
+        UVDECODE_NORMALIZED_SHORT
+    };
+
+    enum TextureSampleMode {
+        TEXSAMPLE_INDEXED_TILE,
+        TEXSAMPLE_RGBA32
+    };
+
+    struct SamplerState {
+        UVDecodeMode decodeMode;
+        TextureSampleMode sampleMode;
+        struct Texture* texture;
+        Tile8* tile;
+
+        SamplerState()
+            : decodeMode(UVDECODE_TEXEL_INT)
+            , sampleMode(TEXSAMPLE_INDEXED_TILE)
+            , texture(NULL)
+            , tile(NULL) {
+        }
+    };
+
+    static SamplerState g_sampler0;
+    static bool g_rgbaUsesVertexColor = false;
+    static bool g_depthTestEnabled = true;
+    static bool g_depthWriteEnabled = true;
+
     uint8 ambient;
     int32 lightsCount;
 
@@ -164,12 +193,32 @@ namespace GAPI {
             if (opt & OPT_PROXY)
                 return;
 
-            ASSERT(memory);
+            ASSERT(memory || fmt == FMT_RGBA || (opt & OPT_DYNAMIC));
+
+            if (sampler == 0) {
+                g_sampler0.texture = this;
+                g_sampler0.tile = NULL;
+
+                if (memory && fmt == FMT_RGBA) {
+                    g_sampler0.decodeMode = UVDECODE_NORMALIZED_SHORT;
+                    g_sampler0.sampleMode = TEXSAMPLE_RGBA32;
+                }
+                else {
+                    g_sampler0.decodeMode = UVDECODE_TEXEL_INT;
+                    g_sampler0.sampleMode = TEXSAMPLE_INDEXED_TILE;
+                }
+            }
+
             curTile = NULL;
         }
 
         void bindTileIndices(Tile8* tile) {
-            curTile = (Tile8*)tile;
+            curTile = tile;
+
+            g_sampler0.texture = NULL;
+            g_sampler0.tile = tile;
+            g_sampler0.decodeMode = UVDECODE_TEXEL_INT;
+            g_sampler0.sampleMode = TEXSAMPLE_INDEXED_TILE;
         }
 
         void unbind(int sampler) {}
@@ -260,6 +309,7 @@ namespace GAPI {
     struct VertexSW {
         int32 x, y, z, w;
         int32 u, v, l;
+        int32 cr, cg, cb, ca;
 
         inline VertexSW operator + (const VertexSW& p) const {
             VertexSW ret;
@@ -270,6 +320,10 @@ namespace GAPI {
             ret.u = u + p.u;
             ret.v = v + p.v;
             ret.l = l + p.l;
+            ret.cr = cr + p.cr;
+            ret.cg = cg + p.cg;
+            ret.cb = cb + p.cb;
+            ret.ca = ca + p.ca;
             return ret;
         }
 
@@ -282,6 +336,10 @@ namespace GAPI {
             ret.u = u - p.u;
             ret.v = v - p.v;
             ret.l = l - p.l;
+            ret.cr = cr - p.cr;
+            ret.cg = cg - p.cg;
+            ret.cb = cb - p.cb;
+            ret.ca = ca - p.ca;
             return ret;
         }
 
@@ -294,6 +352,10 @@ namespace GAPI {
             ret.u = u * s;
             ret.v = v * s;
             ret.l = l * s;
+            ret.cr = cr * s;
+            ret.cg = cg * s;
+            ret.cb = cb * s;
+            ret.ca = ca * s;
             return ret;
         }
 
@@ -306,6 +368,10 @@ namespace GAPI {
             ret.u = u / s;
             ret.v = v / s;
             ret.l = l / s;
+            ret.cr = cr / s;
+            ret.cg = cg / s;
+            ret.cb = cb / s;
+            ret.ca = ca / s;
             return ret;
         }
     };
@@ -328,27 +394,7 @@ namespace GAPI {
         lightsCount = 0;
         swLightmap = swLightmapNone;
         swPalette = swPaletteColor;
-
-        for (int i = 0; i < 256; i++) {
-            swPaletteColor[i] = 0xFF000000u | (uint32(i) << 16) | (uint32(i) << 8) | uint32(i);
-            swPaletteWater[i] = swPaletteColor[i];
-            swPaletteGray[i] = swPaletteColor[i];
-            swGradient[i] = uint8(i);
-        }
-
-        for (int i = 0; i < 256 * 32; i++) {
-            swLightmapNone[i] = uint8(i & 255);
-            swLightmapShade[i] = uint8(i & 255);
-        }
-
-        for (int y = 0; y < 256; y++) {
-            for (int x = 0; x < 256; x++) {
-                swDummyTile.index[(y << 8) + x] = uint8(x ? x : 1);
-            }
-        }
-
-        swLightmap = swLightmapNone;
-        swPalette = swPaletteColor;
+        g_sampler0 = SamplerState();
 
         memset(swDummyTile.index, 0, sizeof(swDummyTile.index));
 
@@ -390,6 +436,11 @@ namespace GAPI {
 
     bool beginFrame() {
         piEnsureBuffers(Core::width, Core::height);
+        g_sampler0 = SamplerState();
+        g_rgbaUsesVertexColor = false;
+        g_depthTestEnabled = true;
+        g_depthWriteEnabled = true;
+        curTile = NULL;
         return true;
     }
 
@@ -457,8 +508,14 @@ namespace GAPI {
         swClipRect.w = y2;
     }
 
-    void setDepthTest(bool enable) {}
-    void setDepthWrite(bool enable) {}
+    void setDepthTest(bool enable) {
+        g_depthTestEnabled = enable;
+    }
+
+    void setDepthWrite(bool enable) {
+        g_depthWriteEnabled = enable;
+    }
+
     void setColorWrite(bool r, bool g, bool b, bool a) {}
     void setAlphaTest(bool enable) {}
     void setCullMode(int rsMask) {}
@@ -509,12 +566,20 @@ namespace GAPI {
         v.u += d.u;
         v.v += d.v;
         v.l += d.l;
+        v.cr += d.cr;
+        v.cg += d.cg;
+        v.cb += d.cb;
+        v.ca += d.ca;
     }
 
     inline void step(VertexSW& v, const VertexSW& d, int32 count) {
         v.u += d.u * count;
         v.v += d.v * count;
         v.l += d.l * count;
+        v.cr += d.cr * count;
+        v.cg += d.cg * count;
+        v.cb += d.cb * count;
+        v.ca += d.ca * count;
     }
 
     const int uvDither[8] = {
@@ -523,7 +588,7 @@ namespace GAPI {
     };
 
     void drawLine(const VertexSW& L, const VertexSW& R, int32 y) {
-        if (!swColor || !curTile)
+        if (!swColor)
             return;
 
         if (y < 0 || y >= piHeight)
@@ -565,15 +630,19 @@ namespace GAPI {
 
         int32 row = y * piWidth;
 
-        Texture* tex = Core::active.textures[0];
-        const bool rgbaTex = tex && tex->memory && tex->fmt == FMT_RGBA;
-
         for (int x = row + x1; x < row + x2; x++) {
             S.z += dS.z;
 
-            if (rgbaTex) {
-                int32 u = int32(uint32(S.u) >> 16);
-                int32 v = int32(uint32(S.v) >> 16);
+            int32 u = int32(uint32(S.u) >> 16);
+            int32 v = int32(uint32(S.v) >> 16);
+
+            if (g_sampler0.sampleMode == TEXSAMPLE_RGBA32 &&
+                g_sampler0.texture &&
+                g_sampler0.texture->memory &&
+                g_sampler0.texture->fmt == FMT_RGBA &&
+                g_sampler0.tile == NULL) {
+
+                Texture* tex = g_sampler0.texture;
 
                 if ((uint32)u < (uint32)tex->origWidth && (uint32)v < (uint32)tex->origHeight) {
                     const uint8* src = tex->memory + (v * tex->width + u) * 4;
@@ -583,15 +652,50 @@ namespace GAPI {
                     uint32 b = src[2];
                     uint32 a = src[3];
 
+                    if (g_rgbaUsesVertexColor) {
+                        uint32 mr = uint32(S.cr >> 16);
+                        uint32 mg = uint32(S.cg >> 16);
+                        uint32 mb = uint32(S.cb >> 16);
+                        uint32 ma = uint32(S.ca >> 16);
+
+                        r = (r * mr) >> 8;
+                        g = (g * mg) >> 8;
+                        b = (b * mb) >> 8;
+                        a = (a * ma) >> 8;
+                    }
+
                     swColor[x] = (a << 24) | (r << 16) | (g << 8) | b;
                 }
+                else {
+                    swColor[x] = 0xFF000000;
+                }
             }
-            else {
-                int32 u = int32(uint32(S.u) >> 16);
-                int32 v = int32(uint32(S.v) >> 16);
+#if 1
+            else if (g_sampler0.sampleMode == TEXSAMPLE_INDEXED_TILE && g_sampler0.tile) {
+                DepthSW z = DepthSW(uint32(S.z) >> 16);
+                bool depthPass = !g_depthTestEnabled || (swDepth[x] >= z);
 
+                if (depthPass) {
+                    if ((uint32)u < 256u && (uint32)v < 256u) {
+                        uint8 index = g_sampler0.tile->index[(v << 8) + u];
+
+                        if (index != 0) {
+                            int32 light = (S.l >> (16 + 3));
+                            if ((uint32)light < 32u) {
+                                index = swLightmap[(light << 8) + index];
+                                swColor[x] = swPalette[index];
+
+                                if (g_depthWriteEnabled)
+                                    swDepth[x] = z;
+                            }
+                        }
+                    }
+                }
+            }
+#else
+            else if (g_sampler0.sampleMode == TEXSAMPLE_INDEXED_TILE && g_sampler0.tile) {
                 if ((uint32)u < 256u && (uint32)v < 256u) {
-                    uint8 index = curTile->index[(v << 8) + u];
+                    uint8 index = g_sampler0.tile->index[(v << 8) + u];
 
                     if (index != 0) {
                         int32 light = (S.l >> (16 + 3));
@@ -602,6 +706,7 @@ namespace GAPI {
                     }
                 }
             }
+#endif
 
             step(S, dS);
         }
@@ -773,15 +878,53 @@ namespace GAPI {
         result.l = (255 - min(255, int32(lighting))) << 16;
     }
 
+    static inline int32 decodeNormalizedShortToTexel16_16(int raw, int texSize) {
+        if (texSize <= 0)
+            return 0;
+
+        // Mirror GL_SHORT + normalized fetch, then scale to backing texture texels.
+        return int32((int64(raw) * int64(texSize) * 65536LL) / 32767LL);
+    }
+
+    static inline void decodeRasterUV16_16(const SamplerState& s, const Vertex& v, int32& outU, int32& outV) {
+        if (s.decodeMode == UVDECODE_NORMALIZED_SHORT && s.texture) {
+            outU = decodeNormalizedShortToTexel16_16(v.texCoord.x, s.texture->width);
+            outV = decodeNormalizedShortToTexel16_16(v.texCoord.y, s.texture->height);
+        }
+        else {
+            outU = int32(v.texCoord.x) << 16;
+            outV = int32(v.texCoord.y) << 16;
+        }
+    }
+
+    static bool rgbaDrawUsesVertexColor(const Index* indices, const Vertex* vertices, int iStart, int iCount, int vStart) {
+        bool sawScreenSpace = false;
+        bool sawNonWhite = false;
+
+        for (int i = 0; i < iCount; i++) {
+            const Vertex& v = vertices[vStart + indices[iStart + i]];
+
+            if (v.coord.w == 1 && v.coord.z == 0)
+                sawScreenSpace = true;
+
+            if (v.light.x != 255 || v.light.y != 255 || v.light.z != 255 || v.light.w != 255)
+                sawNonWhite = true;
+        }
+
+        return sawScreenSpace && sawNonWhite;
+    }
+
     bool transform(const Index* indices, const Vertex* vertices, int iStart, int iCount, int vStart) {
         swVertices.reset();
         swIndices.reset();
         swTriangles.reset();
         swQuads.reset();
 
-        mat4 swMatrix3D;
-        swMatrix3D.viewport(0.0f, (float)piHeight, (float)piWidth, -(float)piHeight, 0.0f, 1.0f);
-        swMatrix3D = swMatrix3D * mViewProj * mModel;
+        mat4 swMatrix;
+        swMatrix.viewport(0.0f, (float)piHeight, (float)piWidth, -(float)piHeight, 0.0f, 1.0f);
+        swMatrix = swMatrix * mViewProj * mModel;
+
+        const SamplerState sampler = g_sampler0;
 
         const bool colored = vertices[vStart + indices[iStart]].color.w == 142;
         int vIndex = 0;
@@ -802,22 +945,24 @@ namespace GAPI {
                 continue;
             }
 
-            vec4 c;
+            VertexSW result;
 
-            const bool is2DFace = (vertex.coord.w == 1 && vertex.coord.z == 0);
+            const bool isScreenRGBA =
+                sampler.sampleMode == TEXSAMPLE_RGBA32 &&
+                vertex.coord.w == 1 &&
+                vertex.coord.z == 0;
 
-            if (is2DFace) {
-                // 2D/UI-style faces: avoid the full 3D view/proj path
-                c.x = float(vertex.coord.x) / 16384.0f;
-                c.y = float(vertex.coord.y) / 16384.0f;
-                c.z = 0.0f;
-                c.w = 1.0f;
+            if (isScreenRGBA) {
+                const float nx = float(vertex.coord.x) / 16384.0f;
+                const float ny = float(vertex.coord.y) / 16384.0f;
 
-                c.x = (c.x * 0.5f + 0.5f) * float(piWidth);
-                c.y = (1.0f - (c.y * 0.5f + 0.5f)) * float(piHeight);
+                result.x = int32(((nx * 0.5f + 0.5f) * float(piWidth)) * 65536.0f);
+                result.y = int32((1.0f - (ny * 0.5f + 0.5f)) * float(piHeight));
+                result.z = 0;
+                result.w = 1 << 16;
             }
             else {
-                c = swMatrix3D * vec4(vertex.coord.x, vertex.coord.y, vertex.coord.z, 1.0f);
+                vec4 c = swMatrix * vec4(vertex.coord.x, vertex.coord.y, vertex.coord.z, 1.0f);
 
                 if (c.w < 0.0f || c.w > SW_MAX_DIST) {
                     if (isTriangle)
@@ -833,46 +978,29 @@ namespace GAPI {
                 c.z /= c.w;
                 c.x = clamp(c.x, -16384.0f, 16384.0f);
                 c.y = clamp(c.y, -16384.0f, 16384.0f);
+
+                result.x = int32(c.x) << 16;
+                result.y = int32(c.y);
+                result.z = uint32(clamp(c.z, 0.0f, 1.0f) * 65535.0f) << 16;
+                result.w = int32(c.w) << 16;
             }
-
-            VertexSW result;
-            result.x = int32(c.x) << 16;
-            result.y = int32(c.y);
-            result.z = uint32(clamp(c.z, 0.0f, 1.0f) * 65535.0f) << 16;
-            result.w = int32(c.w) << 16;
-
-            Texture* tex = Core::active.textures[0];
-
-            const bool isVideoQuad =
-                is2DFace &&
-                tex &&
-                tex->memory &&
-                tex->fmt == FMT_RGBA &&
-                (tex->opt & OPT_DYNAMIC);
 
             if (colored) {
                 result.u = vertex.color.x << 16;
                 result.v = 0;
             }
             else {
-                if (isVideoQuad) {
-                    result.u = vertex.texCoord.x << 10;
-                    result.v = vertex.texCoord.y << 9;
-                }
-                else if (is2DFace) {
-                    //result.u = (vertex.texCoord.x >> 8) << 16;
-                    //result.v = (vertex.texCoord.y >> 8) << 16;
-                    result.u = vertex.texCoord.x << 11;
-                    result.v = vertex.texCoord.y << 10;
-                }
-                else {
-                    result.u = vertex.texCoord.x << 16;
-                    result.v = vertex.texCoord.y << 16;
-                }
+                decodeRasterUV16_16(sampler, vertex, result.u, result.v);
             }
 
             result.l = ((vertex.light.x * ambient) >> 8);
-            applyLighting(result, vertex, c.w);
+            result.cr = vertex.light.x << 16;
+            result.cg = vertex.light.y << 16;
+            result.cb = vertex.light.z << 16;
+            result.ca = vertex.light.w << 16;
+
+            if (!isScreenRGBA)
+                applyLighting(result, vertex, 0.0f);
 
             swIndices.push(swVertices.push(result));
 
@@ -900,6 +1028,10 @@ namespace GAPI {
 
     void DIP(Mesh* mesh, const MeshRange& range) {
         transformLights();
+
+        g_rgbaUsesVertexColor =
+            g_sampler0.sampleMode == TEXSAMPLE_RGBA32 &&
+            rgbaDrawUsesVertexColor(mesh->iBuffer, mesh->vBuffer, range.iStart, range.iCount, range.vStart);
 
         bool colored = transform(mesh->iBuffer, mesh->vBuffer, range.iStart, range.iCount, range.vStart);
 
