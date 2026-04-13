@@ -521,8 +521,11 @@ struct Inventory
         this->lara = lara;
 
         if (page == INV_PAGE_TITLE) {
+            osSetGrayPalette(false);
             background = osLoadScreen(LVL_TR1_TITLE);
-        } else {
+        }
+        else {
+            osSetGrayPalette(true);
             background = copyBackground();
         }
 
@@ -1082,6 +1085,11 @@ struct Inventory
                 timer = 0;
                 state = nextState;
                 nextState = INV_STATE_NONE;
+
+                if (state == INV_STATE_NONE) {
+                    osSetGrayPalette(false);
+                }
+
                 height = heightTarget;
                 radius = radiusTarget;
                 pitch = pitchTarget;

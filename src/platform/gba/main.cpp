@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "game.h"
 
 EWRAM_DATA int32 fps;
@@ -165,16 +167,16 @@ LRESULT CALLBACK wndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
         {
             InputKey key = IK_NONE;
             switch (wParam) {
-                case VK_UP     : key = IK_UP;     break;
-                case VK_RIGHT  : key = IK_RIGHT;  break;
-                case VK_DOWN   : key = IK_DOWN;   break;
-                case VK_LEFT   : key = IK_LEFT;   break;
-                case 'A'       : key = IK_B;      break;
-                case 'S'       : key = IK_A;      break;
-                case 'Q'       : key = IK_L;      break;
-                case 'W'       : key = IK_R;      break;
-                case VK_RETURN : key = IK_START;  break;
-                case VK_SPACE  : key = IK_SELECT; break;
+                case 'W'       : key = IK_UP;     break;
+                case 'D'       : key = IK_RIGHT;  break;
+                case 'S'       : key = IK_DOWN;   break;
+                case 'A'       : key = IK_LEFT;   break;
+                case VK_SPACE       : key = IK_B;      break;
+                case VK_CONTROL       : key = IK_A;      break;
+                case VK_LEFT       : key = IK_L;      break;
+                case VK_RIGHT       : key = IK_R;      break;
+                case VK_RETURN       : key = IK_START;  break;
+                case VK_SHIFT       : key = IK_SELECT; break;
             }
 
             if (wParam == '1') players[0]->extraL->goalWeapon = WEAPON_PISTOLS;
@@ -218,8 +220,10 @@ const void* osLoadLevel(LevelID id)
 
     FILE *f = fopen(buf, "rb");
 
-    if (!f)
+    if (!f) {
+        LOG("Could not open file \"%s\"", buf);
         return NULL;
+    }
 
     {
         fseek(f, 0, SEEK_END);
@@ -276,10 +280,25 @@ int main(void)
     int wx = (GetSystemMetrics(SM_CXSCREEN) - (r.right - r.left)) / 2;
     int wy = (GetSystemMetrics(SM_CYSCREEN) - (r.bottom - r.top)) / 2;
 
-    hWnd = CreateWindow("static", "OpenLara GBA", WS_OVERLAPPEDWINDOW, wx + r.left, wy + r.top, r.right - r.left, r.bottom - r.top, 0, 0, 0, 0);
+    HINSTANCE hInstance = GetModuleHandleW(nullptr);
+
+    hWnd = CreateWindowW(
+        L"static",
+        L"OpenLara GBA",
+        WS_OVERLAPPEDWINDOW,
+        wx + r.left,
+        wy + r.top,
+        r.right - r.left,
+        r.bottom - r.top,
+        nullptr,
+        nullptr,
+        hInstance,
+        nullptr
+    );
+
     hDC = GetDC(hWnd);
 
-    SetWindowLong(hWnd, GWL_WNDPROC, (LONG)&wndProc);
+    SetWindowLongPtr(hWnd, GWLP_WNDPROC, (LONG_PTR)wndProc);
     ShowWindow(hWnd, SW_SHOWDEFAULT);
 
     soundInit();

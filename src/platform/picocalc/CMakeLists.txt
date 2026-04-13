@@ -28,32 +28,34 @@ project(OpenLara-PicoCalc C CXX ASM)
 
 pico_sdk_init()
 
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/pico/drivers/rp2040-psram rp2040-psram)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/picocalc/drivers/rp2040-psram rp2040-psram)
 
 set(TARGET_NAME OpenLara-PicoCalc)
 
 add_executable(${TARGET_NAME}
+    #PsramTest.cpp
     main.cpp
-    pico/PicoInput.cpp
-    pico/PicoFileSystem.cpp
-    pico/PicoCalcDisplay.cpp
-    pico/PicoSouthbridge.cpp
-    pico/Psram.cpp
+    render.cpp
+    sound.cpp
+    LevelLoaderPico.cpp
+    PkdStream.cpp
 
-    pico/drivers/clib.c
-    pico/drivers/fat32.c
-    pico/drivers/sdcard.c
-    pico/drivers/southbridge.c
+    picocalc/PicoCalcDisplay.cpp
+    picocalc/PicoFileSystem.cpp
+    picocalc/PicoInput.cpp
+    picocalc/PicoSouthbridge.cpp
+    picocalc/Psram.cpp
 
-    pico/drivers/rp2040-psram/psram_spi.c
+    picocalc/drivers/clib.c
+    picocalc/drivers/fat32.c
+    picocalc/drivers/sdcard.c
+    picocalc/drivers/southbridge.c
+
+    ../../fixed/common.cpp
 
     ../../libs/tinf/tinflate.c
     ../../libs/minimp3/minimp3.cpp
     ../../libs/stb_vorbis/stb_vorbis.c
-)
-
-pico_generate_pio_header(${TARGET_NAME}
-    ${CMAKE_CURRENT_LIST_DIR}/pico/drivers/rp2040-psram/psram_spi.pio
 )
 
 pico_set_program_name(${TARGET_NAME} "OpenLara-PicoCalc")
@@ -64,21 +66,21 @@ target_compile_features(${TARGET_NAME} PRIVATE cxx_std_20)
 target_compile_definitions(${TARGET_NAME} PRIVATE
     PICO_CLOCK_ADJUST_PERI_CLOCK_WITH_SYS_CLOCK=1
     __PICOCALC__
-    NO_SOUND=1
+    #NO_SOUND=1
 
     PSRAM_MUTEX=1
-    #PSRAM_SPINLOCK=0
     PSRAM_ASYNC=0
     PSRAM_PIN_CS=20
     PSRAM_PIN_SCK=21
     PSRAM_PIN_MOSI=2
     PSRAM_PIN_MISO=3
+
+    $<$<CONFIG:Debug>:_DEBUG>
 )
 
 target_compile_options(${TARGET_NAME} PRIVATE
     -ffunction-sections
     -fdata-sections
-
     $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
     $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
     $<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-enum-enum-conversion>
@@ -87,9 +89,13 @@ target_compile_options(${TARGET_NAME} PRIVATE
 
 target_include_directories(${TARGET_NAME} PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
-    ${CMAKE_CURRENT_LIST_DIR}/pico/drivers
+    ${CMAKE_CURRENT_LIST_DIR}/picocalc
+    ${CMAKE_CURRENT_LIST_DIR}/picocalc/drivers
 
-    ${CMAKE_CURRENT_LIST_DIR}/../..
+    ${CMAKE_CURRENT_LIST_DIR}/../../fixed
+    ${CMAKE_CURRENT_LIST_DIR}/../../fixed/fmt
+    ${CMAKE_CURRENT_LIST_DIR}/../../fixed/lang
+    ${CMAKE_CURRENT_LIST_DIR}/../../fixed/render
     ${CMAKE_CURRENT_LIST_DIR}/../../libs
 )
 

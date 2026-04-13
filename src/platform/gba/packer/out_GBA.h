@@ -2748,7 +2748,7 @@ struct out_GBA
         }
 
         // title screen
-        convertScreen(dir, "TITLE", pc[LVL_TR1_TITLE]->palette);
+        //convertScreen(dir, "TITLE", pc[LVL_TR1_TITLE]->palette);
 
         // audio tracks
         {

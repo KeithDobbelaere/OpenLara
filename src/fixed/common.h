@@ -44,6 +44,24 @@
 
     #define _CRT_SECURE_NO_WARNINGS
     #include <windows.h>
+#elif defined(__PICOCALC_WIN__)
+    #define USE_DIV_TABLE
+
+    #define MODE13
+    #define FRAME_WIDTH  320
+    #define FRAME_HEIGHT 240
+
+    #define USE_FMT     (LVL_FMT_PKD)
+
+    #include <Windows.h>     
+#elif defined(__PICOCALC__)
+    #define USE_DIV_TABLE
+
+    #define MODE13
+    #define FRAME_WIDTH  320
+    #define FRAME_HEIGHT 240
+    
+    #define USE_FMT     (LVL_FMT_PKD)
 #elif defined(__GBA_WIN__)
     #define USE_DIV_TABLE
 
@@ -54,7 +72,7 @@
     #define USE_FMT     (LVL_FMT_PKD)
 
     #define _CRT_SECURE_NO_WARNINGS
-    #include <windows.h>
+    #include <Windows.h>
 #elif defined(__GBA__)
     #define USE_DIV_TABLE
     #define ROM_READ
@@ -179,7 +197,7 @@
         #define LOG(...)    printf(__VA_ARGS__)
     #endif
 #else
-    #define LOG()
+    #define LOG(...)
 #endif
 
 #if !defined(__3DO__)
@@ -245,6 +263,36 @@
     #define FAST_HITMASK
 #endif
 
+#ifdef __PICOCALC_WIN__
+// hide dead enemies after a while to reduce the number of polygons on the screen
+    #define HIDE_CORPSES (30*10) // 10 sec
+// replace trap flor geometry by two flat quads in the static state
+    #define LOD_TRAP_FLOOR
+// disable some plants environment to reduce overdraw of transparent geometry
+    #define NO_STATIC_MESH_PLANTS
+// the maximum of active enemies
+    #define MAX_ENEMIES 3
+// visibility distance
+    #define VIEW_DIST (10 << 10)
+// skip collideSpheres for enemies
+    #define FAST_HITMASK
+#endif
+
+#ifdef __PICOCALC__
+// hide dead enemies after a while to reduce the number of polygons on the screen
+    #define HIDE_CORPSES (30*10) // 10 sec
+// replace trap flor geometry by two flat quads in the static state
+    #define LOD_TRAP_FLOOR
+// disable some plants environment to reduce overdraw of transparent geometry
+    #define NO_STATIC_MESH_PLANTS
+// the maximum of active enemies
+    #define MAX_ENEMIES 3
+// visibility distance
+    #define VIEW_DIST (10 << 10)
+// skip collideSpheres for enemies
+    #define FAST_HITMASK
+#endif
+
 #ifndef NAV_STEPS
     #define NAV_STEPS 5
 #endif
@@ -267,12 +315,23 @@
     #define ALIGN4
     #define ALIGN8
     #define ALIGN16
+#elif defined(__PICOCALC__)
+    #define X_INLINE           inline
+    #define X_TIME_CRITICAL(x) __no_inline_not_in_flash_func(x)
+    #define X_NOINLINE         __attribute__((noinline))
+    #define ALIGN4             alignas(4)
+    #define ALIGN8             alignas(8)
+    #define ALIGN16            alignas(16)
 #else
     #define X_INLINE    __attribute__((always_inline)) inline
     #define X_NOINLINE  __attribute__((noinline))
     #define ALIGN4      __attribute__((aligned(4)))
     #define ALIGN8      __attribute__((aligned(8)))
     #define ALIGN16     __attribute__((aligned(16)))
+#endif
+
+#ifndef X_TIME_CRITICAL
+    #define X_TIME_CRITICAL(x) x
 #endif
 
 #if defined(__3DO__)
@@ -300,11 +359,15 @@ typedef uint16             divTableInt;
 
 #define ADDR_ALIGN4(x)  ((uint8*)x += ((intptr_t(x) + 3) & ~3) - intptr_t(x))
 
-//#include <new>
+#ifdef __PICOCALC__
+#include <new>
+#include <cstdint>
+#else
 inline void* operator new(size_t, void *ptr)
 {
     return ptr;
 }
+#endif
 
 #if defined(__3DO__) || defined(__32X__)
 X_INLINE int32 abs(int32 x) {
@@ -312,7 +375,7 @@ X_INLINE int32 abs(int32 x) {
 }
 #endif
 
-#if defined(__GBA__) || defined(__NDS__) || defined(__32X__)
+#if defined(__GBA__) || defined(__NDS__) || defined(__32X__) || defined(__PICOCALC__)
     #define int2str(x,str) itoa(x, str, 10)
 #elif defined(__3DO__)
     #define int2str(x,str) sprintf(str, "%d", x)
@@ -346,6 +409,8 @@ X_INLINE int32 abs(int32 x) {
     extern uint16 fb[FRAME_WIDTH * FRAME_HEIGHT];
 #elif defined(__GBA__)
     extern uint32 fb;
+#elif defined(__PICOCALC_WIN__) || defined (__PICOCALC__)
+    extern uint8 fb[FRAME_WIDTH * FRAME_HEIGHT];
 #elif defined(__TNS__)
     extern uint16 fb[FRAME_WIDTH * FRAME_HEIGHT];
 #elif defined(__DOS__)
@@ -387,6 +452,14 @@ extern uint8* vramPtr;
 #if defined(__WIN32__)
     #define SND_SAMPLES      1024
     #define SND_OUTPUT_FREQ  22050
+    #define SND_SAMPLE_FREQ  22050
+    #define SND_ENCODE(x)    ((x) + 128)
+    #define SND_DECODE(x)    ((x) - 128)
+    #define SND_MIN          -128
+    #define SND_MAX          127
+#elif defined(__PICOCALC_WIN__) || defined (__PICOCALC__)
+    #define SND_SAMPLES      1024
+    #define SND_OUTPUT_FREQ  11025
     #define SND_SAMPLE_FREQ  22050
     #define SND_ENCODE(x)    ((x) + 128)
     #define SND_DECODE(x)    ((x) - 128)
@@ -1440,17 +1513,17 @@ enum Weapon
     WEAPON_MAGNUMS,
     WEAPON_UZIS,
     WEAPON_SHOTGUN,
-    // WEAPON_DESERT_EAGLE,
-    // WEAPON_REVOLVER,
-    // WEAPON_M16
-    // WEAPON_MP5
-    // WEAPON_HK
-    // WEAPON_ROCKET
-    // WEAPON_GRENADE
-    // WEAPON_HARPOON
-    // WEAPON_CROSSBOW
-    // WEAPON_GRAPPLING
-    // WEAPON_FLARE
+    //WEAPON_DESERT_EAGLE,
+    //WEAPON_REVOLVER,
+    //WEAPON_M16,
+    //WEAPON_MP5,
+    //WEAPON_HK,
+    //WEAPON_ROCKET,
+    //WEAPON_GRENADE,
+    //WEAPON_HARPOON,
+    //WEAPON_CROSSBOW,
+    //WEAPON_GRAPPLING,
+    //WEAPON_FLARE,
     WEAPON_NONE,
     WEAPON_MAX
 };
@@ -2183,6 +2256,8 @@ struct ADPCM4_STATE
         y = (y * d) >> (16 - PROJ_SHIFT);\
     }
 #else
+    #define PROJ_SHIFT 4
+    #define PERSPECTIVE_DZ(z) (z >> PROJ_SHIFT)
     #define PERSPECTIVE(x, y, z) {\
         int32 dz = (z >> (FIXED_SHIFT + FOV_SHIFT - 1)) / 3;\
         if (dz >= DIV_TABLE_SIZE) dz = DIV_TABLE_SIZE - 1;\
@@ -2807,7 +2882,7 @@ void matrixFrame_c(const void* pos, const void* angles);
 void matrixFrameLerp(const void* pos, const void* anglesA, const void* anglesB, int32 delta, int32 rate);
 void matrixSetView(const vec3i &pos, int32 angleX, int32 angleY);
 
-#if defined(__GBA__) || defined(__GBA_WIN__)
+#if defined(__GBA__) || defined(__GBA_WIN__) || defined(__PICOCALC_WIN__) || defined(__PICOCALC__)
 #define renderInit()
 #define renderFree()
 #define renderSwap()
@@ -2819,6 +2894,25 @@ void renderFree();
 void renderSwap();
 void renderLevelInit();
 void renderLevelFree();
+#endif
+
+#if defined(__PICOCALC__) || defined(__PICOCALC_WIN__)
+extern uint32 gLevelSoundPsramAddr;
+extern uint32 gLevelSoundPsramSize;
+
+bool osReadLevelSoundData(uint32 offset, void* dst, uint32 size);
+bool osHasLevelSoundDataInPsram();
+bool osBuildRoomRenderPsram(Level* level);
+void osResetRoomRenderCache();
+bool gameLoadLevelPicoCalc(LevelID id);
+void osResetTileCache();
+#else
+#define osReadLevelSoundData(offset, dst, size) (false)
+#define osHasLevelSoundDataInPsram() (false)
+#define osBuildRoomRenderPsram(level) (true)
+#define osResetRoomRenderCache()
+#define osResetTileCache()
+#define gameLoadLevelPicoCalc(id) (false)
 #endif
 
 void setViewport(const RectMinMax &vp);
@@ -2834,6 +2928,7 @@ void renderBorder(int32 x, int32 y, int32 width, int32 height, int32 color1, int
 void renderBar(int32 x, int32 y, int32 width, int32 value, BarType type);
 void renderBackground(const void* background);
 void* copyBackground();
+void osSetGrayPalette(bool enabled);
 
 int32 getTextWidth(const char* text);
 
@@ -2950,7 +3045,7 @@ const void* osLoadLevel(LevelID id);
         #define PROFILE_STOP(value) {\
             value += (osGetSystemTimeMS() - g_timer);\
         }
-    #elif defined(__WIN32__) || defined(__GBA_WIN__)
+    #elif defined(__WIN32__) || defined(__GBA_WIN__) || defined(__PICOCALC_WIN__)
         extern LARGE_INTEGER g_timer;
         extern LARGE_INTEGER g_current;
 
@@ -2962,7 +3057,7 @@ const void* osLoadLevel(LevelID id);
             QueryPerformanceCounter(&g_current);\
             value += uint32(g_current.QuadPart - g_timer.QuadPart);\
         }
-    #elif defined(__GBA__)
+    #elif defined(__GBA__) || defined(__PICOCALC__)
         #ifdef PROFILE_SOUNDTIME
             #define TIMER_FREQ_DIV 1
         #else

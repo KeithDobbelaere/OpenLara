@@ -8,6 +8,8 @@ bool read_PKD(DataStream &f)
 {
     const uint8* data = f.getPtr();
 
+	if (!data)		return false;
+
     memcpy(&level, data, sizeof(level));
 
     { // fix level data offsets

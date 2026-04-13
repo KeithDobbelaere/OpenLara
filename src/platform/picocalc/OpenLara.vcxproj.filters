@@ -1,0 +1,112 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="render.cpp" />
+    <ClCompile Include="sound.cpp" />
+    <ClCompile Include="picocalc\PicoCalcDisplay.cpp">
+      <Filter>picocalc</Filter>
+    </ClCompile>
+    <ClCompile Include="picocalc\PicoInput.cpp">
+      <Filter>picocalc</Filter>
+    </ClCompile>
+    <ClCompile Include="picocalc\PicoSouthbridge.cpp">
+      <Filter>picocalc</Filter>
+    </ClCompile>
+    <ClCompile Include="picocalc\Psram.cpp">
+      <Filter>picocalc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\fixed\common.cpp">
+      <Filter>/../../fixed</Filter>
+    </ClCompile>
+    <ClCompile Include="PkdStream.cpp">
+      <Filter>picocalc</Filter>
+    </ClCompile>
+    <ClCompile Include="LevelLoaderPico.cpp">
+      <Filter>picocalc</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="rasterizer.h" />
+    <ClInclude Include="picocalc\PicoCalcDisplay.hpp">
+      <Filter>picocalc</Filter>
+    </ClInclude>
+    <ClInclude Include="picocalc\PicoInput.hpp">
+      <Filter>picocalc</Filter>
+    </ClInclude>
+    <ClInclude Include="picocalc\PicoSouthbridge.hpp">
+      <Filter>picocalc</Filter>
+    </ClInclude>
+    <ClInclude Include="picocalc\Psram.hpp">
+      <Filter>picocalc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\camera.h">
+      <Filter>/../../fixed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\common.h">
+      <Filter>/../../fixed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\draw.h">
+      <Filter>/../../fixed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\enemy.h">
+      <Filter>/../../fixed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\game.h">
+      <Filter>/../../fixed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\inventory.h">
+      <Filter>/../../fixed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\item.h">
+      <Filter>/../../fixed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\lara.h">
+      <Filter>/../../fixed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\level.h">
+      <Filter>/../../fixed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\nav.h">
+      <Filter>/../../fixed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\object.h">
+      <Filter>/../../fixed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\room.h">
+      <Filter>/../../fixed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\stream.h">
+      <Filter>/../../fixed</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\lang\en.h">
+      <Filter>/../../fixed\lang</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\fmt\pkd.h">
+      <Filter>/../../fixed\format</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\fixed\fmt\phd.h">
+      <Filter>/../../fixed\format</Filter>
+    </ClInclude>
+    <ClInclude Include="picocalc\Keys.hpp">
+      <Filter>picocalc</Filter>
+    </ClInclude>
+    <ClInclude Include="PkdStream.hpp">
+      <Filter>picocalc</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="picocalc">
+      <UniqueIdentifier>{69342692-4f0e-4789-a004-f7acd92978df}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="/../../fixed">
+      <UniqueIdentifier>{8af08d29-2b33-422d-8a10-b7b9da0e2316}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="/../../fixed\lang">
+      <UniqueIdentifier>{e3f785e2-10df-47f7-a038-f9d829de0e88}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="/../../fixed\format">
+      <UniqueIdentifier>{a972e5b0-bbc1-4cfe-957a-a7d2d424e56e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

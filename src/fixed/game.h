@@ -127,20 +127,8 @@ void resetLara(int32 index, int32 roomIndex, const vec3i &pos, int32 angleY)
     rooms[roomIndex].add(lara);
 }
 
-void gameLoadLevel(const void* data)
+void initLevelRuntime()
 {
-    drawLevelFree();
-
-    memset(&gSaveGame, 0, sizeof(gSaveGame));
-    memset(enemiesExtra, 0, sizeof(enemiesExtra));
-
-    ItemObj::sFirstActive = NULL;
-    ItemObj::sFirstFree = NULL;
-
-    gCurTrack = -1;
-
-    readLevel((uint8*)data);
-
     // prepare rooms
     for (int32 i = 0; i < level.roomsCount; i++)
     {
@@ -165,7 +153,8 @@ void gameLoadLevel(const void* data)
         items->extraL = playersExtra;
         items->extraL->camera.mode = CAMERA_MODE_FOLLOW;
         inventory.open(items, INV_PAGE_TITLE);
-    } else {
+    }
+    else {
         inventory.page = INV_PAGE_MAIN;
 
         // init items
@@ -195,36 +184,25 @@ void gameLoadLevel(const void* data)
         {
             gCinematicCamera.initCinematic();
         }
-
-
-    // gym
-        //resetLara(0, 7, _vec3i(39038, -1280, 51712), ANGLE_90); // start
-        //resetLara(0, 8, _vec3i(55994, 0, 52603), ANGLE_90); // piano
-        //resetLara(0, 9, _vec3i(47672, 256, 40875), ANGLE_90); // hall
-        //resetLara(0, 13, _vec3i(38953, 3328, 63961), ANGLE_90 + ANGLE_45); // pool
-    // level 1
-        //resetLara(0, 0, _vec3i(74588, 3072, 19673), ANGLE_0); // first darts
-        //resetLara(0, 9, _vec3i(49669, 7680, 57891), ANGLE_0); // first door
-        //resetLara(0, 10, _vec3i(43063, 7168, 61198), ANGLE_0); // transp
-        //resetLara(0, 14, _vec3i(20215, 6656, 52942), ANGLE_90 + ANGLE_45); // bridge
-        //resetLara(0, 25, _vec3i(8789, 5632, 80173), 0); // portal
-        //resetLara(0, 17, _vec3i(16475, 6656, 59845), ANGLE_90); // bear
-        //resetLara(0, 26, _vec3i(24475, 6912, 83505), ANGLE_90); // switch timer 1
-        //resetLara(0, 35, _vec3i(35149, 2048, 74189), ANGLE_90); // switch timer 2
-    // level 2
-        //resetLara(0, 15, _vec3i(66179, 0, 25920), -ANGLE_90 - ANGLE_45); // sprites
-        //resetLara(0, 19, _vec3i(61018, 1024, 31214), ANGLE_180); // block
-        //resetLara(0, 14, _vec3i(64026, 512, 20806), ANGLE_0); // key and puzzle
-        //resetLara(0, 5, _vec3i(55644, 0, 29155), -ANGLE_90); // keyhole
-        //resetLara(0, 71, _vec3i(12705, -768, 30195), -ANGLE_90); // puzzle
-        //resetLara(0, 63, _vec3i(31055, -2048, 33406), ANGLE_0); // right room
-        //resetLara(0, 44, _vec3i(27868, -1024, 29191), -ANGLE_90); // swing blades
-    // level 3a
-        //resetLara(0, 44, _vec3i(73798, 2304, 9819), ANGLE_90); // uw gears
-        //resetLara(0, 51, _vec3i(41015, 3584, 34494), ANGLE_180); // valley
     }
 
     drawLevelInit();
+}
+
+void gameLoadLevel(const void* data)
+{
+    drawLevelFree();
+
+    memset(&gSaveGame, 0, sizeof(gSaveGame));
+    memset(enemiesExtra, 0, sizeof(enemiesExtra));
+
+    ItemObj::sFirstActive = NULL;
+    ItemObj::sFirstFree = NULL;
+
+    gCurTrack = -1;
+
+    readLevel((uint8*)data);
+    initLevelRuntime();
 }
 
 void startLevel(LevelID id)
@@ -235,8 +213,15 @@ void startLevel(LevelID id)
     sndStop();
     sndFreeSamples();
 
+#if defined(__PICOCALC__) || defined(__PICOCALC_WIN__)
+    if (!gameLoadLevelPicoCalc(id)) {
+        LOG("gameLoadLevelPicoCalc failed");
+        return;
+    }
+#else
     const void* data = osLoadLevel(id);
     gameLoadLevel(data);
+#endif
 
     sndInitSamples();
     sndPlayTrack(getAmbientTrack());
@@ -330,14 +315,12 @@ void gameRender()
 
             for (int32 i = 0; i < MAX_PLAYERS; i++)
             {
-                // TODO set viewports for coop
-            #ifndef PROFILE_SOUNDTIME
                 if (isCutsceneLevel()) {
                     drawCinematicRooms();
-                } else {
+                }
+                else if (players[i]) {
                     drawRooms(&players[i]->extraL->camera);
                 }
-            #endif
 
                 if (players[i])
                 {

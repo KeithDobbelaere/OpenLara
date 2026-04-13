@@ -2,161 +2,137 @@
 
 ## Goal
 
-Use a Windows software backend to get TR2 running well enough to understand the render path, texture usage, and asset requirements before trying to force the full problem onto PicoCalc.
+I’m porting the original GBA version of Tomb Raider I to PicoCalc.
 
-The point of this phase is not to finish a PicoCalc port. It is to figure out what has to be cut, simplified, or rewritten so PicoCalc has a chance.
+I’ve moved away from trying to study and shrink TR2 through a custom Windows-first path. That was turning into a much bigger engine project than I actually wanted. The GBA port is already much closer to PicoCalc’s limits, so it makes more sense as the base.
 
 ## Current direction
 
-The current workflow is:
+Right now, the plan is simple:
 
-- keep working in Windows
-- use Visual Studio for editing and debugging
-- keep `_GAPI_PICOCALC` as its own backend
-- use the software backend to study what TR2 is actually doing
-- reduce assets and runtime requirements there first
-- bring that reduced design back to PicoCalc later
+- use the original GBA TR1 port as the base
+- keep PicoCalc as the real target
+- fix correctness first
+- solve memory problems in a practical way
+- optimize after the game is actually working
 
-## Why this approach
+Windows is still useful when I need it, but it is no longer the center of the project.
 
-Trying to do platform bring-up, renderer work, asset handling, and memory reduction on PicoCalc at the same time was the wrong order.
+## Why this changed
 
-Windows is the easier place to answer the important questions:
+Trying to force a larger engine down onto PicoCalc was the wrong fight.
 
-- what the engine is drawing
-- what texture paths are in use
-- what special cases exist
-- what assets are too large
-- what can be reduced or removed
+The GBA port already lives in a smaller world:
+- simpler assumptions
+- tighter rendering constraints
+- more realistic content scale
 
-That gives us something concrete to aim for on PicoCalc instead of guessing.
+That makes it a much better fit for PicoCalc.
 
-## Why not just use `_GAPI_SW`
+## What matters right now
 
-`_GAPI_SW` is still a useful reference, but it is not the right long-term fit for this project.
+My priorities are:
 
-It carries assumptions that do not line up cleanly with the eventual PicoCalc renderer, especially around texture handling and general software-renderer structure.
+- correct title and menu rendering
+- correct palette and texture handling
+- stable file loading
+- sensible PSRAM usage
+- getting gameplay scenes running correctly on-device
 
-The plan is to borrow what is useful from `sw.h`, not turn PicoCalc into `_GAPI_SW`.
+## PSRAM note
 
-## What the software backend is for now
+PSRAM is useful, but the way it is wired on this hardware is kind of torturous and backward.
 
-The Windows software backend is now the main test bed for:
+It is not set up like normal RAM that the system can just treat as a natural extension of memory. In practice, it behaves much more like awkward external storage than true general-purpose RAM.
 
-- TR2 render behavior
-- texture handling
-- UV conventions
-- 2D face / UI-style paths
-- dynamic RGBA texture updates
-- general asset and memory pressure
+That means I should treat it carefully:
+- hot runtime data stays in SRAM
+- large blobs can live in PSRAM
+- access should go through explicit helpers
+- caching or staging is often the right answer
 
-This is where we figure out what the game actually needs in order to look acceptable.
+It helps, but it comes with real friction, and the hardware does not make it pleasant.
 
-## Visual Studio’s role
+## Rendering direction
 
-Visual Studio is the practical place to do this work right now.
+The renderer should stay small and practical:
 
-It makes it much easier to:
+- SPI display output
+- RGB565 final image
+- tight memory use
+- bounded, predictable work
+- no unnecessary complexity
 
-- inspect matrices, UVs, and textures
-- compare backend revisions
-- catch crashes in transform, texture, and raster code
-- step through special cases quickly
+The point is to make the GBA port fit PicoCalc well, not to grow it into a different engine.
 
-That matters more at this stage than trying to keep everything PicoCalc-first.
+## What can wait
 
-## Immediate objective
+For now, I can ignore:
 
-The goal right now is to get TR2 rendering through `_GAPI_PICOCALC` on Windows well enough to study it.
-
-That means:
-
-- visible geometry
-- enough texture support to understand the content path
-- enough special-case handling for problem areas like 2D faces and RGBA-backed textures
-- enough stability to use the build as a reduction tool
-
-## Asset reduction strategy
-
-The software backend is now also a way to decide what the final PicoCalc target can afford.
-
-Likely reduction work includes:
-
-- downscaling textures
-- converting texture data into formats friendlier to RGB565 output
-- avoiding retention of large source blobs where possible
-- simplifying or removing expensive texture paths
-- cutting nonessential content and features
-- reducing memory duplication during load and update
-
-That work is easier to reason about on Windows first.
-
-## Long-term renderer direction
-
-The final PicoCalc renderer will still likely look more like the Geometry Vibes 3D renderer than any desktop backend:
-
-- SPI output
-- RGB565
-- tight memory limits
-- slabbed or otherwise bounded rendering
-- Core0/Core1 split where useful
-- DMA-driven display transfer
-
-That has not changed.
-
-What has changed is the order: first understand and reduce the content on Windows, then shape the PicoCalc renderer around that reduced target.
-
-## What should wait
-
-For now, these can wait:
-
-- polished on-device renderer integration
-- full feature parity
-- accurate effects
-- audio polish
-- save/load polish
-- final PicoCalc display path
-
-The current phase is about understanding the game’s needs and shrinking them.
+- big renderer redesigns
+- polish that does not help bring-up
+- speculative optimization
+- anything that distracts from getting the game running correctly
 
 ## Near-term milestones
 
 ### Milestone 1
-TR2 runs through `_GAPI_PICOCALC` in a Windows software backend.
+Title and menu paths render correctly on PicoCalc.
 
 ### Milestone 2
-Major scene types are visible and debuggable.
+Gameplay scenes load and display correctly.
 
 ### Milestone 3
-Texture paths and special cases are understood well enough to classify cleanly.
+Asset loading is stable, with PSRAM used where it makes sense.
 
 ### Milestone 4
-Start reducing assets and runtime requirements in the Windows build.
+The biggest bottlenecks are identified.
 
 ### Milestone 5
-Define a reduced target that PicoCalc could plausibly run.
-
-### Milestone 6
-Move that reduced design back toward a real PicoCalc renderer.
-
-## PSRAM note
-
-The PicoCalc board includes external PSRAM, but it is not arranged like normal directly mapped system RAM (why???!).
-
-It is not sitting on the Pico 2 module's QSPI/XIP path, so we should not assume it can be treated like ordinary pointer-addressable memory. In practice, this means PSRAM is better thought of as external storage with access overhead, not as a transparent heap extension.
-
-That has two immediate design consequences:
-
-- hot runtime data should stay in internal SRAM
-- PSRAM-resident data will likely need an access wrapper or staging layer rather than raw pointer-style use
-
-For large blob-like resources, a wrapper with indexed access, windowing, or explicit read/write helpers is probably the right direction. Pointer-rich engine structures should not be the first target for PSRAM.
+The game becomes meaningfully playable (Not sure this is possible at this point with the PSRAM limitations).
 
 ## Bottom line
 
-The current strategy is simple:
+The plan now is:
 
-- get TR2 running in software on Windows
-- use Visual Studio to understand it
-- reduce the game to something PicoCalc can realistically handle
-- then build the PicoCalc version around that reduced target
+- port the original GBA TR1 version
+- keep PicoCalc as the real target
+- get correctness first
+- use PSRAM carefully
+- optimize once the port is solid
+
+## Building and running
+
+### PicoCalc build and run
+
+For the real target, I build the PicoCalc version in VS Code.
+
+General flow:
+
+1. Open the project in VS Code.
+2. Build from VS Code.
+2. Connect the Pico 2 via micro USB.
+4. Press the **Bootload** button on the Pico 2 so it mounts as a UF2 device.
+5. Copy the built UF2 to it.
+6. Make sure the required `data/` files are present on the PicoCalc SD card.
+7. Boot the device and watch serial output for loader, PSRAM, and rendering issues via USB-C.
+
+### Windows build and run
+
+Windows is the easier place to inspect behavior quickly. The PSRAM object will emulate real-world latencies.
+
+For Windows, I build and run through Visual Studio.
+
+General flow:
+
+1. Open the solution in Visual Studio.
+2. Make sure you are building for x86.
+3. Build and run from Visual Studio.
+4. Make sure the required `data/` files are available to the executable.
+
+### Notes
+
+A few things matter in both environments:
+
+- the `data/` folder needs to contain the files the game expects
+- if something works in Windows but fails on PicoCalc, you should first suspect timing, memory, display, or I/O differences
